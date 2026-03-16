@@ -1,0 +1,22 @@
+{
+  "manifest_version": 2,
+  "name": "Schedurler",
+  "version": "0.1.0",
+  "description": "Thin Firefox tab agent for the local Schedurler controller.",
+  "permissions": [
+    "tabs",
+    "storage",
+    "<all_urls>"
+  ],
+  "background": {
+    "scripts": [
+      "src/background.js"
+    ]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "schedurler@example.local"
+    }
+  }
+}
+

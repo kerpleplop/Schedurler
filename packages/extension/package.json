@@ -1,0 +1,7 @@
+{
+  "name": "@schedurler/extension",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Firefox extension agent for Schedurler"
+}
+

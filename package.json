@@ -1,0 +1,21 @@
+{
+  "name": "schedurler",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b packages/shared packages/controller",
+    "build:shared": "tsc -b packages/shared",
+    "build:controller": "tsc -b packages/controller",
+    "dev:controller": "npm run build:shared && tsx packages/controller/src/index.ts",
+    "start:controller": "npm run build && node packages/controller/dist/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
+

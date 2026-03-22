@@ -2,6 +2,12 @@
 
 Use this with `AGENTS.md`, not instead of it.
 
+## Profile Guidance
+- Profiles are model/reasoning presets, not automatic bindings to agent names.
+- Use `package_local` for routine package-local implementation and review.
+- Use `contracts_review` for `packages/shared` and boundary-sensitive contract review.
+- Use `integration_review` for main-thread synthesis, cross-package integration, and verifier-style review.
+
 ## Analysis-First
 - Main thread reads `AGENTS.md` and the relevant package files first.
 - Spawn `contracts-guardian` to inspect shared-contract impact only when a task may cross package boundaries.
@@ -25,7 +31,7 @@ Use this with `AGENTS.md`, not instead of it.
 - Have the main thread resolve findings, integrate cross-package fixes, and write the final synthesis.
 
 ## Likely Next Step
-- For controller web server and local-network browser UI work, expect `controller-builder` to own most implementation.
+- For controller-hosted web UI and local-network browser access work, expect `controller-builder` to own most implementation.
 - Use `contracts-guardian` only if shared API or shared data shapes truly need to change.
 - Use `extension-builder` only if browser-side protocol behavior changes.
 - Use `repo-guardian` only for targeted doc updates once the implementation path is settled.

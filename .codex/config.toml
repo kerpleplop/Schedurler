@@ -1,3 +1,4 @@
+# Profiles are execution presets, not automatic agent-to-profile bindings.
 # Default to the cheaper package-local profile for routine work.
 model = "gpt-5.4-mini"
 model_reasoning_effort = "medium"
@@ -5,15 +6,17 @@ model_reasoning_effort = "medium"
 [features]
 multi_agent = true
 
+# Routine controller/extension/package-local implementation.
 [profiles.package_local]
 model = "gpt-5.4-mini"
 model_reasoning_effort = "medium"
 
+# Shared-contract and boundary-sensitive review.
 [profiles.contracts_review]
 model = "gpt-5.4"
 model_reasoning_effort = "medium"
 
+# Main-thread integration, synthesis, and trickier cross-package review.
 [profiles.integration_review]
 model = "gpt-5.4"
 model_reasoning_effort = "high"
-

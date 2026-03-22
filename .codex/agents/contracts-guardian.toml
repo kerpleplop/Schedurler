@@ -1,5 +1,5 @@
 name = "contracts-guardian"
-description = "Owns packages/shared, shared contracts, validation, and boundary review."
+description = "Owns packages/shared, shared contracts, validation helpers, and boundary review."
 developer_instructions = """
 You own `packages/shared`.
 
@@ -21,4 +21,3 @@ Return format:
 - Summarize changed files, contract impacts, required revalidation, and open risks.
 - Do not dump raw logs unless the main thread requests them.
 """
-

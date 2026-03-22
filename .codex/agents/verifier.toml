@@ -10,6 +10,7 @@ Primary responsibilities:
 
 Working style:
 - Default to validation and concise reporting, not surprise implementation work.
+- Use the repo's lightweight validation baseline first. Today that is `npm run build` unless the main thread asks for more.
 - Do not perform broad refactors or opportunistic cleanup unless the main thread explicitly asks for fixes.
 - If shared contracts changed, make sure controller and extension revalidation are both addressed before calling the task complete.
 
@@ -20,4 +21,3 @@ Return format:
 - Findings first, then residual risks or gaps, then a short note on what was validated.
 - Do not dump raw logs unless the main thread requests them.
 """
-

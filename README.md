@@ -2,6 +2,22 @@
 
 Schedurler is a local-first monorepo for a controller service, a Firefox extension, and shared contracts that coordinate scheduled browser tab actions.
 
+The intended finished product is a single controller running on one machine and serving a browser-based web app to other devices on the same trusted local network. People should be able to open the local web app from a phone, laptop, or desktop browser, manage bookmarks and schedules there, and have the controller instruct one or more connected Firefox extensions to carry out the actual browser tab actions on their machines.
+
+## Product Direction
+- One controller instance runs at a time and remains the source of truth for bookmarks, schedules, and device-local active state.
+- The controller will host a user-friendly web app for trusted local-network use only, not public-internet deployment.
+- Multiple web clients may be connected to the controller web UI at the same time.
+- Multiple Firefox extensions may be connected to the controller at the same time so the same bookmark or schedule action can be applied across multiple computers.
+- Bookmarks are saved in the controller-owned library and should support create, edit, rename, keyword tagging, sorting, and manual loading.
+- Schedules are controller-owned 24-hour cycle definitions that map saved bookmarks to times of day and should support create, edit, rename, duplicate, activate, and event-level changes.
+- The extension remains thin: it executes controller-issued browser actions and reports results back, but it does not own bookmark or schedule data.
+
+## Current Status
+- The controller already owns storage access, a small HTTP API, and the WebSocket connection to extensions.
+- The Firefox extension already executes the controller command loop for opening, closing, muting, unmuting, and reporting tab state.
+- The next major implementation surface is the controller-hosted web UI and the controller-local HTTP/API layer that supports it.
+
 ## Packages
 - `packages/shared`: shared types, protocol definitions, constants, and validation helpers
 - `packages/controller`: local Node controller with storage access, HTTP API, and WebSocket server

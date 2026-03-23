@@ -1,0 +1,4 @@
+interface:
+  display_name: "Shared Contract Change Gate"
+  short_description: "Gate packages/shared contract edits"
+  default_prompt: "Use $shared-contract-change-gate to decide whether this Schedurler change belongs in packages/shared."

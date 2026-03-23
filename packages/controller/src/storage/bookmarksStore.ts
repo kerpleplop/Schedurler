@@ -17,5 +17,9 @@ export class BookmarksStore {
 
     return data;
   }
-}
 
+  async getById(bookmarkId: string): Promise<Bookmark | null> {
+    const bookmarks = await this.list();
+    return bookmarks.find((bookmark) => bookmark.id === bookmarkId) ?? null;
+  }
+}

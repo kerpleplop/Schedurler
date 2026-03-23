@@ -1,0 +1,357 @@
+:root {
+  --ink-strong: #16302b;
+  --ink-soft: #426059;
+  --surface-0: #f5f3eb;
+  --surface-1: rgba(255, 252, 245, 0.92);
+  --surface-2: rgba(245, 241, 230, 0.9);
+  --line: rgba(22, 48, 43, 0.12);
+  --accent: #d86f45;
+  --accent-strong: #b9562d;
+  --success: #2f7a58;
+  --warning: #9a5c21;
+  --shadow: 0 22px 60px rgba(33, 44, 40, 0.12);
+  --radius-lg: 26px;
+  --radius-md: 18px;
+  --radius-sm: 999px;
+  --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --font-body: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(216, 111, 69, 0.18), transparent 32%),
+    radial-gradient(circle at top right, rgba(40, 122, 88, 0.12), transparent 28%),
+    linear-gradient(160deg, #f8f4ea 0%, #efe8d9 42%, #f7f2e8 100%);
+  color: var(--ink-strong);
+  font-family: var(--font-body);
+}
+
+button,
+select {
+  font: inherit;
+}
+
+.app-shell {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.hero-copy {
+  max-width: 700px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: var(--accent-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2.4rem, 5vw, 4.1rem);
+  line-height: 0.95;
+}
+
+h2 {
+  font-size: 1.6rem;
+}
+
+.lede {
+  margin: 14px 0 0;
+  max-width: 620px;
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 330px) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.panel {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+  padding: 22px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.panel-header-wide {
+  align-items: flex-start;
+}
+
+.facts {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+
+.facts div {
+  padding: 14px 16px;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+
+.facts dt {
+  margin: 0 0 6px;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.facts dd {
+  margin: 0;
+  font-size: 0.98rem;
+  word-break: break-word;
+}
+
+.status-pill {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(47, 122, 88, 0.12);
+  color: var(--success);
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.panel-message {
+  margin: 18px 0 10px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.panel-subtle,
+#bookmark-count {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.sort-control {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.sort-control select {
+  min-width: 170px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink-strong);
+}
+
+.secondary-button,
+.load-button {
+  border: 0;
+  border-radius: var(--radius-sm);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.secondary-button {
+  padding: 11px 18px;
+  background: rgba(22, 48, 43, 0.08);
+  color: var(--ink-strong);
+  font-weight: 700;
+}
+
+.load-button {
+  padding: 11px 16px;
+  background: var(--accent);
+  color: #fff9f2;
+  font-weight: 700;
+  box-shadow: 0 12px 24px rgba(216, 111, 69, 0.24);
+}
+
+.secondary-button:hover,
+.load-button:hover {
+  transform: translateY(-1px);
+}
+
+.secondary-button:hover {
+  background: rgba(22, 48, 43, 0.14);
+}
+
+.load-button:hover {
+  background: var(--accent-strong);
+}
+
+.secondary-button:disabled,
+.load-button:disabled {
+  transform: none;
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.feedback {
+  min-height: 1.5em;
+  margin: 0 0 12px;
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.feedback.success {
+  color: var(--success);
+}
+
+.bookmark-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.bookmark-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 18px;
+  border: 1px solid rgba(22, 48, 43, 0.08);
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(252, 247, 239, 0.9)),
+    rgba(255, 255, 255, 0.8);
+}
+
+.bookmark-card.current {
+  border-color: rgba(216, 111, 69, 0.36);
+  box-shadow: inset 0 0 0 1px rgba(216, 111, 69, 0.14);
+}
+
+.bookmark-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.bookmark-name {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  line-height: 1.05;
+}
+
+.bookmark-current {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(216, 111, 69, 0.12);
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.bookmark-url {
+  margin: 10px 0 0;
+  color: var(--ink-soft);
+  word-break: break-word;
+}
+
+.keyword-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.keyword-pill {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(47, 122, 88, 0.12);
+  color: var(--success);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.bookmark-empty {
+  padding: 28px 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    width: min(100% - 24px, 1120px);
+    padding-top: 20px;
+  }
+
+  .hero,
+  .layout,
+  .bookmark-card {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .hero {
+    gap: 16px;
+  }
+
+  .panel-header,
+  .panel-header-wide {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .secondary-button,
+  .load-button,
+  .sort-control,
+  .sort-control select {
+    width: 100%;
+  }
+}

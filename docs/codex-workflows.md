@@ -30,6 +30,11 @@ Use this with `AGENTS.md`, not instead of it.
 - Run `verifier` after the implementation phase.
 - Have the main thread resolve findings, integrate cross-package fixes, and write the final synthesis.
 
+## Repo-Local Skills
+- `AGENTS.md` is the canonical source of truth for repo-local skills, their triggers, and their rationale.
+- Use the repo-local skills listed there as task playbooks layered on top of `.codex/agents/*.toml`.
+- This document intentionally does not duplicate the skill list so the workflow guidance and skill catalog do not drift apart.
+
 ## Likely Next Step
 - For controller-hosted web UI and local-network browser access work, expect `controller-builder` to own most implementation.
 - Use `contracts-guardian` only if shared API or shared data shapes truly need to change.

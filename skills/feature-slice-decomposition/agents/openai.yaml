@@ -1,0 +1,4 @@
+interface:
+  display_name: "Feature Slice Decomposition"
+  short_description: "Split a feature across agents safely"
+  default_prompt: "Use $feature-slice-decomposition to break this Schedurler feature into safe main-thread and subagent slices."

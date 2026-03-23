@@ -46,3 +46,11 @@ Schedurler is a local-first system for opening, focusing, muting, unmuting, and 
 - If `packages/shared` changes, the controller and extension must both be revalidated before the task is considered complete.
 - Subagents should return concise summaries to the main thread: changed files, contract impact, validation status, and blockers. Do not dump noisy raw logs unless the main thread explicitly asks for them.
 - For likely future controller web UI work, keep the controller as the main implementation surface, involve `packages/shared` only for real shared-contract changes, and involve the extension only if browser-side protocol behavior must change.
+
+## Repo-Local Skills
+- Repo-local skills live under `skills/`. Treat them as task playbooks layered on top of this file and `.codex/agents/*.toml`.
+- This section is the canonical source of truth for which repo-local skills exist and why they are used.
+- `skills/controller-web-ui-slice`: use for controller-hosted browser UI, static asset serving, UI-facing controller APIs, and trusted local-network browser access work. This improves AI-driven coding by keeping web UI work controller-first, surfacing LAN bind and exposure checks early, and preventing accidental reuse of extension protocol shapes or premature `packages/shared` growth.
+- `skills/feature-slice-decomposition`: use before multi-package or multi-agent implementation to assign ownership, sequencing, and return contracts. This improves subagent-driven coding by creating non-overlapping write scopes, making serialization versus parallelism explicit, and standardizing what each subagent must return to the main thread.
+- `skills/shared-contract-change-gate`: use before editing `packages/shared` or proposing shared types for browser UI work. This improves boundary-sensitive coding by forcing shared-contract justification up front, blocking controller-local or UI-only shapes from leaking into `packages/shared`, and making downstream controller and extension revalidation explicit.
+- Keep `AGENTS.md` as the architecture and boundary source of truth even when a repo-local skill is active.

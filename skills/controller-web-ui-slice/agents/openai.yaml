@@ -1,0 +1,4 @@
+interface:
+  display_name: "Controller Web UI Slice"
+  short_description: "Plan controller-hosted UI changes"
+  default_prompt: "Use $controller-web-ui-slice to plan a controller-hosted web UI change for Schedurler."

@@ -116,6 +116,13 @@ h2 {
   align-items: flex-start;
 }
 
+.bookmark-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
 .facts {
   display: grid;
   gap: 14px;
@@ -350,6 +357,7 @@ h2 {
 
   .secondary-button,
   .load-button,
+  .bookmark-controls,
   .sort-control,
   .sort-control select {
     width: 100%;

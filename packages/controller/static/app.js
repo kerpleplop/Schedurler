@@ -1,6 +1,7 @@
 const state = {
   snapshot: null,
-  sort: "name",
+  sort: "name-asc",
+  keywordFilter: "__all__",
   loading: false,
   loadingBookmarkId: null
 };
@@ -8,6 +9,7 @@ const state = {
 const elements = {
   refreshButton: document.querySelector("#refresh-button"),
   sortSelect: document.querySelector("#sort-select"),
+  keywordFilterSelect: document.querySelector("#keyword-filter-select"),
   feedback: document.querySelector("#feedback"),
   bookmarkList: document.querySelector("#bookmark-list"),
   bookmarkCount: document.querySelector("#bookmark-count"),
@@ -37,6 +39,11 @@ function bindEvents() {
 
   elements.sortSelect.addEventListener("change", (event) => {
     state.sort = event.target.value;
+    render();
+  });
+
+  elements.keywordFilterSelect.addEventListener("change", (event) => {
+    state.keywordFilter = event.target.value;
     render();
   });
 
@@ -139,12 +146,15 @@ function render() {
   const currentBookmark = bookmarks.find(
     (bookmark) => bookmark.id === controllerState.currentBookmarkId
   );
-  const sortedBookmarks = [...bookmarks].sort(createBookmarkComparator(state.sort));
+  const visibleBookmarks = [...bookmarks]
+    .filter((bookmark) => matchesKeywordFilter(bookmark, state.keywordFilter))
+    .sort(createBookmarkComparator(state.sort));
   const statusLabel =
     controller.status === "ready"
       ? "Ready"
       : "Waiting for Firefox extension";
 
+  syncKeywordFilterOptions(bookmarks);
   elements.connectionSummary.textContent = `${extensionConnections} extension connection${
     extensionConnections === 1 ? "" : "s"
   }`;
@@ -160,20 +170,27 @@ function render() {
     ? "LAN access is enabled for trusted local-network clients."
     : "LAN access is currently loopback-only. Start the controller with HOST=0.0.0.0 to open this page from another device on the same trusted network.";
   elements.lastUpdated.textContent = `Snapshot updated ${formatTimestamp(generatedAt)}.`;
-  elements.bookmarkCount.textContent = `${bookmarks.length} bookmark${
-    bookmarks.length === 1 ? "" : "s"
-  } available`;
+  elements.bookmarkCount.textContent = buildBookmarkCountLabel(
+    visibleBookmarks.length,
+    bookmarks.length,
+    state.keywordFilter
+  );
 
-  renderBookmarks(sortedBookmarks, {
+  renderBookmarks(visibleBookmarks, {
     currentBookmarkId: controllerState.currentBookmarkId,
-    extensionConnections
+    extensionConnections,
+    keywordFilter: state.keywordFilter
   });
 }
 
 function renderBookmarks(bookmarks, options) {
   if (bookmarks.length === 0) {
     elements.bookmarkList.innerHTML =
-      '<li class="bookmark-empty">No bookmarks are saved in the controller library yet.</li>';
+      options.keywordFilter === "__all__"
+        ? '<li class="bookmark-empty">No bookmarks are saved in the controller library yet.</li>'
+        : `<li class="bookmark-empty">No bookmarks match the keyword "${escapeHtml(
+            options.keywordFilter
+          )}".</li>`;
     return;
   }
 
@@ -218,28 +235,55 @@ function renderBookmarks(bookmarks, options) {
 }
 
 function createBookmarkComparator(sortKey) {
-  if (sortKey === "keyword") {
-    return (left, right) => {
-      const leftKeyword = firstKeyword(left);
-      const rightKeyword = firstKeyword(right);
-
-      if (leftKeyword !== rightKeyword) {
-        return leftKeyword.localeCompare(rightKeyword);
-      }
-
-      return left.name.localeCompare(right.name);
-    };
+  if (sortKey === "name-desc") {
+    return (left, right) => right.name.localeCompare(left.name);
   }
 
   return (left, right) => left.name.localeCompare(right.name);
 }
 
-function firstKeyword(bookmark) {
-  if (!Array.isArray(bookmark.keywords) || bookmark.keywords.length === 0) {
-    return "~";
+function syncKeywordFilterOptions(bookmarks) {
+  const keywords = [...collectKeywords(bookmarks)];
+
+  if (!keywords.includes(state.keywordFilter) && state.keywordFilter !== "__all__") {
+    state.keywordFilter = "__all__";
   }
 
-  return [...bookmark.keywords].sort((left, right) => left.localeCompare(right))[0];
+  elements.keywordFilterSelect.replaceChildren(
+    new Option("All keywords", "__all__"),
+    ...keywords.map((keyword) => new Option(keyword, keyword))
+  );
+  elements.keywordFilterSelect.value = state.keywordFilter;
+}
+
+function collectKeywords(bookmarks) {
+  const keywords = new Set();
+
+  for (const bookmark of bookmarks) {
+    for (const keyword of bookmark.keywords) {
+      keywords.add(keyword);
+    }
+  }
+
+  return [...keywords].sort((left, right) => left.localeCompare(right));
+}
+
+function matchesKeywordFilter(bookmark, keywordFilter) {
+  if (keywordFilter === "__all__") {
+    return true;
+  }
+
+  return bookmark.keywords.includes(keywordFilter);
+}
+
+function buildBookmarkCountLabel(visibleCount, totalCount, keywordFilter) {
+  if (keywordFilter === "__all__") {
+    return `${totalCount} bookmark${totalCount === 1 ? "" : "s"} available`;
+  }
+
+  return `${visibleCount} of ${totalCount} bookmark${
+    totalCount === 1 ? "" : "s"
+  } match "${keywordFilter}"`;
 }
 
 function describeActiveAction(controllerState, bookmarks) {

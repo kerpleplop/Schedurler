@@ -61,13 +61,22 @@
               <p id="bookmark-count" class="panel-subtle">Loading...</p>
             </div>
 
-            <label class="sort-control" for="sort-select">
-              <span>Sort by</span>
-              <select id="sort-select">
-                <option value="name">Name (A-Z)</option>
-                <option value="keyword">Keyword (A-Z)</option>
-              </select>
-            </label>
+            <div class="bookmark-controls">
+              <label class="sort-control" for="sort-select">
+                <span>Sort by</span>
+                <select id="sort-select">
+                  <option value="name-asc">Name (A-Z)</option>
+                  <option value="name-desc">Name (Z-A)</option>
+                </select>
+              </label>
+
+              <label class="sort-control" for="keyword-filter-select">
+                <span>Filter keyword</span>
+                <select id="keyword-filter-select">
+                  <option value="__all__">All keywords</option>
+                </select>
+              </label>
+            </div>
           </div>
 
           <p id="feedback" class="feedback" role="status" aria-live="polite"></p>

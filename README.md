@@ -57,3 +57,5 @@ The same-origin web UI at `/` can also load saved bookmarks through the controll
 - `PORT`: controller port, defaults to `4312`
 
 If the storage env vars are unset, the controller uses local development folders under `./data/shared` and `./data/local` and creates the JSON files on first start.
+
+On a fresh controller setup, `bookmarks.json` is seeded with three example bookmarks so the web UI has placeholder data for manual loading and sorting tests right away.

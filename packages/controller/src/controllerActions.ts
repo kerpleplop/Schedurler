@@ -34,6 +34,8 @@ export async function dispatchOpenUrlCommand(
     source: options.source
   };
 
+  // Manual and API-triggered loads fan out to every connected extension so one
+  // controller action can affect multiple Firefox instances on the trusted LAN.
   const deliveredTo = options.socketServer.broadcastCommand(command);
 
   if (deliveredTo === 0) {
@@ -52,6 +54,9 @@ export async function dispatchOpenUrlCommand(
       url: options.url,
       startedAt: command.sentAt,
       source: options.source,
+      // Controller state tracks the latest controller-issued action, not per-
+      // extension completion. Extension messages may later move this to
+      // completed or failed as results arrive.
       status: "pending"
     }
   };

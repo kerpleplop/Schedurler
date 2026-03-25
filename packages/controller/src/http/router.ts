@@ -16,6 +16,8 @@ export async function handleControllerRequest(
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://controller.local");
 
+  // The controller serves the first web UI slice same-origin so the browser app
+  // can use controller-local HTTP shapes without adding CORS or shared UI DTOs.
   if (method === "GET" && (await handleStaticRequest(url.pathname, response))) {
     return;
   }

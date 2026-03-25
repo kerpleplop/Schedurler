@@ -19,6 +19,8 @@ export async function buildControllerSnapshot(
       lanAccessEnabled: !LOOPBACK_HOSTS.has(context.settings.host)
     },
     extensionConnections,
+    // This snapshot is intentionally controller-local: it aggregates UI needs
+    // without promoting browser-facing response shapes into packages/shared.
     state: context.stateRef.current,
     bookmarks
   };

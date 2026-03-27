@@ -27,6 +27,7 @@ Schedurler is a local-first system for opening, focusing, muting, unmuting, and 
 - Firefox is the initial browser target. Do not assume Chromium-only APIs.
 - Do not implement speculative scheduling features before the controller, protocol, and tab-action loop are solid.
 - Keep comments short and only where boundaries or intent are not obvious from the code.
+- When boundary or intent comments exist at architectural seams, read them before changing the behavior they describe and update them in the same change if the behavior or rationale moves.
 
 ## Naming And Scope
 - Keep the product name `Schedurler` everywhere.

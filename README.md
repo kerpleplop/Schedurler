@@ -14,9 +14,10 @@ The intended finished product is a single controller running on one machine and 
 - The extension remains thin: it executes controller-issued browser actions and reports results back, but it does not own bookmark or schedule data.
 
 ## Current Status
-- The controller already owns storage access, a small HTTP API, and the WebSocket connection to extensions.
+- The controller already owns storage access, a small HTTP API, the controller-hosted web UI, and the WebSocket connection to extensions.
+- The first controller-hosted web UI slice serves a same-origin browser app at `/` with controller status, bookmark listing and sorting, and manual bookmark loading.
 - The Firefox extension already executes the controller command loop for opening, closing, muting, unmuting, and reporting tab state.
-- The next major implementation surface is the controller-hosted web UI and the controller-local HTTP/API layer that supports it.
+- The next major implementation surfaces are bookmark editing, schedule management, and richer multi-client status updates in the controller-hosted web app.
 
 ## Packages
 - `packages/shared`: shared types, protocol definitions, constants, and validation helpers
@@ -32,17 +33,22 @@ The intended finished product is a single controller running on one machine and 
    ```bash
    npm run dev:controller
    ```
-3. Temporarily load the Firefox extension:
+3. Open the controller web UI:
+   - Local machine: `http://127.0.0.1:4312/`
+   - Trusted LAN clients: start the controller with `HOST=0.0.0.0` and open `http://<controller-machine-ip>:4312/`
+4. Temporarily load the Firefox extension:
    - Open `about:debugging`
    - Select `This Firefox`
    - Choose `Load Temporary Add-on...`
    - Pick `packages/extension/manifest.json`
-4. Trigger an end-to-end command once the extension is connected:
+5. Trigger an end-to-end command once the extension is connected:
    ```bash
    curl -X POST http://127.0.0.1:4312/api/commands/open-url \
      -H "content-type: application/json" \
      -d '{"url":"https://example.com","source":"manual"}'
    ```
+
+The same-origin web UI at `/` can also load saved bookmarks through the controller once one or more Firefox extensions are connected.
 
 ## Environment Variables
 - `SHARED_DATA_DIR`: shared path for `bookmarks.json` and `schedules.json`
@@ -51,3 +57,5 @@ The intended finished product is a single controller running on one machine and 
 - `PORT`: controller port, defaults to `4312`
 
 If the storage env vars are unset, the controller uses local development folders under `./data/shared` and `./data/local` and creates the JSON files on first start.
+
+On a fresh controller setup, `bookmarks.json` is seeded with three example bookmarks so the web UI has placeholder data for manual loading and sorting tests right away.

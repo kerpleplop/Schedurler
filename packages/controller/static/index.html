@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Schedurler Controller</title>
+    <link rel="stylesheet" href="/assets/app.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Trusted Local Network</p>
+          <h1>Schedurler Controller</h1>
+          <p class="lede">
+            Open saved bookmarks across connected Firefox extensions from one
+            controller-hosted page.
+          </p>
+        </div>
+        <button id="refresh-button" class="secondary-button" type="button">
+          Refresh
+        </button>
+      </header>
+
+      <main class="layout">
+        <section class="panel status-panel" aria-labelledby="status-heading">
+          <div class="panel-header">
+            <h2 id="status-heading">Controller Status</h2>
+            <p id="connection-summary" class="status-pill">Loading...</p>
+          </div>
+
+          <dl class="facts">
+            <div>
+              <dt>Controller ID</dt>
+              <dd id="controller-id">Loading...</dd>
+            </div>
+            <div>
+              <dt>Bind Host</dt>
+              <dd id="controller-host">Loading...</dd>
+            </div>
+            <div>
+              <dt>Port</dt>
+              <dd id="controller-port">Loading...</dd>
+            </div>
+            <div>
+              <dt>Current Bookmark</dt>
+              <dd id="current-bookmark">None</dd>
+            </div>
+          </dl>
+
+          <p id="controller-message" class="panel-message"></p>
+          <p id="active-action" class="panel-subtle"></p>
+          <p id="lan-message" class="panel-subtle"></p>
+          <p id="last-updated" class="panel-subtle"></p>
+        </section>
+
+        <section class="panel bookmarks-panel" aria-labelledby="bookmarks-heading">
+          <div class="panel-header panel-header-wide">
+            <div>
+              <h2 id="bookmarks-heading">Bookmarks</h2>
+              <p id="bookmark-count" class="panel-subtle">Loading...</p>
+            </div>
+
+            <div class="bookmark-controls">
+              <label class="sort-control" for="sort-select">
+                <span>Sort by</span>
+                <select id="sort-select">
+                  <option value="name-asc">Name (A-Z)</option>
+                  <option value="name-desc">Name (Z-A)</option>
+                </select>
+              </label>
+
+              <label class="sort-control" for="keyword-filter-select">
+                <span>Filter keyword</span>
+                <select id="keyword-filter-select">
+                  <option value="__all__">All keywords</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
+          <ul id="bookmark-list" class="bookmark-list"></ul>
+        </section>
+      </main>
+    </div>
+
+    <script src="/assets/app.js"></script>
+  </body>
+</html>

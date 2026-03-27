@@ -53,17 +53,18 @@ export class ControllerSocketServer {
     return count;
   }
 
-  sendCommand(command: ControllerToExtensionMessage): boolean {
+  broadcastCommand(command: ControllerToExtensionMessage): number {
     const payload = JSON.stringify(command);
+    let deliveredTo = 0;
 
     for (const socket of this.sockets) {
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(payload);
-        return true;
+        deliveredTo += 1;
       }
     }
 
-    return false;
+    return deliveredTo;
   }
 
   private async handleMessage(data: RawData): Promise<void> {
@@ -101,4 +102,3 @@ function toUtf8(data: RawData): string {
 
   return data.toString("utf8");
 }
-

@@ -2,11 +2,23 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ActiveTabActionSource } from "@schedurler/shared";
 import { dispatchOpenUrlCommand } from "../controllerActions";
 import { buildControllerSnapshot } from "./snapshot";
-import { isRecord, readJsonBody, sendJson } from "./response";
+import {
+  isRecord,
+  readJsonBody,
+  sendJson,
+  sendMethodNotAllowed
+} from "./response";
 import { handleStaticRequest } from "./static";
 import type { ControllerRequestContext } from "./types";
 
 const LOAD_BOOKMARK_PATH = /^\/api\/bookmarks\/([^/]+)\/load$/;
+const GET_ONLY_PATHS = new Set([
+  "/health",
+  "/api/state",
+  "/api/bookmarks",
+  "/api/schedules"
+]);
+const POST_ONLY_PATHS = new Set(["/api/commands/open-url"]);
 
 export async function handleControllerRequest(
   request: IncomingMessage,
@@ -19,6 +31,23 @@ export async function handleControllerRequest(
   // The controller serves the first web UI slice same-origin so the browser app
   // can use controller-local HTTP shapes without adding CORS or shared UI DTOs.
   if (method === "GET" && (await handleStaticRequest(url.pathname, response))) {
+    return;
+  }
+
+  if (GET_ONLY_PATHS.has(url.pathname) && method !== "GET") {
+    sendMethodNotAllowed(response, ["GET"]);
+    return;
+  }
+
+  if (POST_ONLY_PATHS.has(url.pathname) && method !== "POST") {
+    sendMethodNotAllowed(response, ["POST"]);
+    return;
+  }
+
+  const bookmarkId = getLoadBookmarkId(url.pathname);
+
+  if (bookmarkId && method !== "POST") {
+    sendMethodNotAllowed(response, ["POST"]);
     return;
   }
 
@@ -54,8 +83,6 @@ export async function handleControllerRequest(
     await handleOpenUrlRequest(request, response, context);
     return;
   }
-
-  const bookmarkId = getLoadBookmarkId(url.pathname);
 
   if (method === "POST" && bookmarkId) {
     await handleLoadBookmarkRequest(bookmarkId, response, context);

@@ -24,6 +24,14 @@ export function sendJson(
   response.end(JSON.stringify(payload, null, 2));
 }
 
+export function sendMethodNotAllowed(
+  response: ServerResponse,
+  allowedMethods: string[]
+): void {
+  response.setHeader("allow", allowedMethods.join(", "));
+  sendJson(response, 405, { error: "Method not allowed" });
+}
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }

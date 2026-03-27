@@ -1,8 +1,4 @@
-import {
-  createServer,
-  type Server,
-  type ServerResponse
-} from "node:http";
+import { createServer, type Server } from "node:http";
 import {
   type ControllerSettings,
   type ControllerState,
@@ -11,6 +7,7 @@ import {
 import type { BookmarksStore } from "./storage/bookmarksStore";
 import type { ControllerStateStore } from "./storage/controllerStateStore";
 import type { SchedulesStore } from "./storage/schedulesStore";
+import { sendJson } from "./http/response";
 import { handleControllerRequest } from "./http/router";
 import { ControllerSocketServer } from "./ws/socketServer";
 
@@ -55,10 +52,4 @@ export async function startControllerServer(
   });
 
   return { httpServer, socketServer };
-}
-
-function sendJson(response: ServerResponse, statusCode: number, payload: unknown): void {
-  response.statusCode = statusCode;
-  response.setHeader("content-type", "application/json; charset=utf-8");
-  response.end(JSON.stringify(payload, null, 2));
 }

@@ -1,4 +1,4 @@
-# Schedurler Agent Guide
+# Schedurler AI Agent Guide
 
 ## Product
 Schedurler is a local-first system for opening, focusing, muting, unmuting, and closing browser tabs or URLs on a schedule. The controller runs on a user machine, owns the data model for that machine, and coordinates a thin browser extension over WebSocket.

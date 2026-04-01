@@ -1,18 +1,18 @@
 :root {
   color-scheme: dark;
-  --ink-strong: #edf3ef;
-  --ink-soft: #b6c8c0;
-  --ink-muted: #8ea199;
-  --surface-0: #07110f;
-  --surface-1: rgba(16, 27, 24, 0.86);
-  --surface-2: rgba(24, 38, 34, 0.88);
-  --surface-3: rgba(34, 52, 47, 0.92);
-  --line: rgba(214, 233, 224, 0.1);
-  --line-strong: rgba(214, 233, 224, 0.18);
+  --ink-strong: #ebeff5;
+  --ink-soft: #b4bdc9;
+  --ink-muted: #8b95a2;
+  --surface-0: #06080c;
+  --surface-1: rgba(16, 19, 25, 0.88);
+  --surface-2: rgba(22, 27, 34, 0.92);
+  --surface-3: rgba(32, 38, 47, 0.94);
+  --line: rgba(224, 232, 242, 0.1);
+  --line-strong: rgba(224, 232, 242, 0.18);
   --accent: #ff9968;
   --accent-strong: #ffc099;
   --accent-ink: #20130d;
-  --success: #7bd5ae;
+  --success: #9dceb9;
   --warning: #f1c36b;
   --shadow: 0 28px 70px rgba(0, 0, 0, 0.34);
   --focus-ring: 0 0 0 3px rgba(255, 153, 104, 0.24);
@@ -31,10 +31,10 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(255, 153, 104, 0.18), transparent 30%),
-    radial-gradient(circle at top right, rgba(123, 213, 174, 0.12), transparent 24%),
-    radial-gradient(circle at bottom, rgba(59, 87, 79, 0.24), transparent 38%),
-    linear-gradient(160deg, var(--surface-0) 0%, #0b1715 38%, #101d1b 100%);
+    radial-gradient(circle at top left, rgba(255, 153, 104, 0.12), transparent 28%),
+    radial-gradient(circle at top right, rgba(125, 160, 147, 0.06), transparent 24%),
+    radial-gradient(circle at bottom, rgba(70, 78, 94, 0.22), transparent 38%),
+    linear-gradient(160deg, var(--surface-0) 0%, #0b1016 42%, #121822 100%);
   color: var(--ink-strong);
   font-family: var(--font-body);
 }
@@ -169,7 +169,7 @@ h2 {
   padding: 8px 12px;
   width: fit-content;
   border-radius: var(--radius-sm);
-  background: rgba(123, 213, 174, 0.14);
+  background: rgba(157, 206, 185, 0.12);
   color: var(--success);
   font-size: 0.9rem;
   font-weight: 700;
@@ -206,7 +206,7 @@ h2 {
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(11, 21, 18, 0.94);
+  background: rgba(12, 15, 20, 0.94);
   color: var(--ink-strong);
 }
 
@@ -223,7 +223,7 @@ h2 {
 
 .secondary-button {
   padding: 11px 18px;
-  background: rgba(237, 243, 239, 0.08);
+  background: rgba(235, 239, 245, 0.07);
   border-color: var(--line);
   color: var(--ink-strong);
   font-weight: 700;
@@ -243,7 +243,7 @@ h2 {
 }
 
 .secondary-button:hover {
-  background: rgba(237, 243, 239, 0.12);
+  background: rgba(235, 239, 245, 0.11);
   border-color: var(--line-strong);
 }
 
@@ -301,7 +301,7 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 22px;
   background:
-    linear-gradient(135deg, var(--surface-3), rgba(24, 36, 33, 0.94)),
+    linear-gradient(135deg, var(--surface-3), rgba(24, 30, 38, 0.94)),
     var(--surface-2);
 }
 
@@ -354,7 +354,7 @@ h2 {
 .keyword-pill {
   padding: 6px 10px;
   border-radius: var(--radius-sm);
-  background: rgba(123, 213, 174, 0.14);
+  background: rgba(157, 206, 185, 0.12);
   color: var(--success);
   font-size: 0.84rem;
   font-weight: 700;
@@ -363,7 +363,7 @@ h2 {
 .bookmark-empty {
   padding: 28px 18px;
   border-radius: 22px;
-  background: rgba(20, 31, 28, 0.82);
+  background: rgba(18, 22, 29, 0.84);
   border: 1px dashed var(--line);
   color: var(--ink-soft);
   text-align: center;

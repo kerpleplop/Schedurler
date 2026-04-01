@@ -1,5 +1,7 @@
+import os from "node:os";
 import { randomUUID } from "node:crypto";
 import type {
+  ControllerSettings,
   ControllerState,
   ExtensionToControllerMessage
 } from "@schedurler/shared";
@@ -46,6 +48,7 @@ async function main(): Promise<void> {
   console.log(
     `[schedurler] websocket endpoint ws://${settings.host}:${settings.port}${wsPath}`
   );
+  logNetworkingHints(settings);
 }
 
 function createDefaultState(): ControllerState {
@@ -120,8 +123,30 @@ async function handleExtensionMessage(
   await controllerStateStore.save(stateRef.current);
 }
 
+function logNetworkingHints(settings: ControllerSettings): void {
+  if (isLoopbackHost(settings.host)) {
+    console.log(
+      "[schedurler] loopback-only access is enabled. Restart with HOST=0.0.0.0 or --host=0.0.0.0 to allow trusted LAN clients."
+    );
+    return;
+  }
+
+  if (isWslEnvironment()) {
+    console.log(
+      `[schedurler] WSL2 note: remote devices reach the Windows host first. Forward Windows TCP port ${settings.port} to this WSL instance and allow it through Windows Firewall for LAN access.`
+    );
+  }
+}
+
+function isLoopbackHost(host: string): boolean {
+  return host === "127.0.0.1" || host === "localhost" || host === "::1";
+}
+
+function isWslEnvironment(): boolean {
+  return Boolean(process.env.WSL_DISTRO_NAME) || os.release().toLowerCase().includes("microsoft");
+}
+
 main().catch((error) => {
   console.error("[schedurler] controller failed to start", error);
   process.exitCode = 1;
 });
-

@@ -168,7 +168,7 @@ function render() {
   elements.activeAction.textContent = describeActiveAction(controllerState, bookmarks);
   elements.lanMessage.textContent = controller.lanAccessEnabled
     ? "LAN access is enabled for trusted local-network clients."
-    : "LAN access is currently loopback-only. Start the controller with HOST=0.0.0.0 to open this page from another device on the same trusted network.";
+    : "LAN access is currently loopback-only. Restart with HOST=0.0.0.0 or --host=0.0.0.0 to open this page from another device on the same trusted network. WSL2 setups also need Windows port forwarding.";
   elements.lastUpdated.textContent = `Snapshot updated ${formatTimestamp(generatedAt)}.`;
   elements.bookmarkCount.textContent = buildBookmarkCountLabel(
     visibleBookmarks.length,

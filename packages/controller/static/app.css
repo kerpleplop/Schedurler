@@ -116,6 +116,12 @@ h2 {
   align-items: flex-start;
 }
 
+.status-panel-header {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
 .bookmark-controls {
   display: flex;
   flex-wrap: wrap;
@@ -153,11 +159,16 @@ h2 {
 .status-pill {
   margin: 0;
   padding: 8px 12px;
+  width: fit-content;
   border-radius: var(--radius-sm);
   background: rgba(47, 122, 88, 0.12);
   color: var(--success);
   font-size: 0.9rem;
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-heading {
   white-space: nowrap;
 }
 

@@ -14,21 +14,25 @@ export type ControllerRuntimeConfig = {
 };
 
 export function loadControllerConfig(
-  cwd: string = process.cwd()
+  cwd: string = process.cwd(),
+  env: NodeJS.ProcessEnv = process.env,
+  argv: string[] = process.argv.slice(2)
 ): ControllerRuntimeConfig {
+  const hostOverride = readHostOverride(env, argv);
+  const portOverride = readPortOverride(env, argv);
   const sharedDataDir =
-    normalizePath(process.env.SHARED_DATA_DIR) ??
+    normalizePath(env.SHARED_DATA_DIR) ??
     path.resolve(cwd, "data/shared");
   const localDataDir =
-    normalizePath(process.env.LOCAL_DATA_DIR) ??
+    normalizePath(env.LOCAL_DATA_DIR) ??
     path.resolve(cwd, "data/local");
 
   return {
     settings: {
       sharedDataDir,
       localDataDir,
-      host: normalizePath(process.env.HOST) ?? DEFAULT_CONTROLLER_HOST,
-      port: parsePort(process.env.PORT, DEFAULT_CONTROLLER_PORT)
+      host: hostOverride ?? DEFAULT_CONTROLLER_HOST,
+      port: parsePort(portOverride, DEFAULT_CONTROLLER_PORT)
     },
     wsPath: DEFAULT_CONTROLLER_WS_PATH
   };
@@ -50,6 +54,69 @@ function normalizePath(value: string | undefined): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function readHostOverride(
+  env: NodeJS.ProcessEnv,
+  argv: string[]
+): string | null {
+  return (
+    readArgumentValue(argv, "host") ??
+    readAssignmentValue(argv, "HOST") ??
+    normalizePath(env.HOST) ??
+    normalizePath(env.npm_config_host)
+  );
+}
+
+function readPortOverride(
+  env: NodeJS.ProcessEnv,
+  argv: string[]
+): string | undefined {
+  return (
+    readArgumentValue(argv, "port") ??
+    readAssignmentValue(argv, "PORT") ??
+    env.PORT ??
+    env.npm_config_port
+  );
+}
+
+function readArgumentValue(argv: string[], name: string): string | undefined {
+  const flag = `--${name}`;
+  const flagPrefix = `${flag}=`;
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index];
+
+    if (argument === flag) {
+      return argv[index + 1];
+    }
+
+    if (argument.startsWith(flagPrefix)) {
+      return argument.slice(flagPrefix.length);
+    }
+  }
+
+  return undefined;
+}
+
+function readAssignmentValue(argv: string[], name: string): string | undefined {
+  for (const argument of argv) {
+    const separatorIndex = argument.indexOf("=");
+
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = argument.slice(0, separatorIndex);
+
+    if (key.toUpperCase() !== name) {
+      continue;
+    }
+
+    return argument.slice(separatorIndex + 1);
+  }
+
+  return undefined;
+}
+
 function parsePort(value: string | undefined, fallback: number): number {
   if (!value) {
     return fallback;
@@ -63,4 +130,3 @@ function parsePort(value: string | undefined, fallback: number): number {
 
   return parsed;
 }
-

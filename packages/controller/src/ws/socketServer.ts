@@ -23,6 +23,9 @@ export class ControllerSocketServer {
       server: options.server,
       path: options.path
     });
+    this.wss.on("error", (error) => {
+      console.error("[schedurler] websocket server error", error);
+    });
 
     this.wss.on("connection", (socket) => {
       this.sockets.add(socket);
@@ -53,17 +56,24 @@ export class ControllerSocketServer {
     return count;
   }
 
-  sendCommand(command: ControllerToExtensionMessage): boolean {
+  broadcastCommand(command: ControllerToExtensionMessage): number {
     const payload = JSON.stringify(command);
+    let deliveredTo = 0;
 
     for (const socket of this.sockets) {
       if (socket.readyState === WebSocket.OPEN) {
-        socket.send(payload);
-        return true;
+        try {
+          socket.send(payload);
+          deliveredTo += 1;
+        } catch (error) {
+          this.sockets.delete(socket);
+          socket.terminate();
+          console.error("[schedurler] failed to send websocket command", error);
+        }
       }
     }
 
-    return false;
+    return deliveredTo;
   }
 
   private async handleMessage(data: RawData): Promise<void> {
@@ -101,4 +111,3 @@ function toUtf8(data: RawData): string {
 
   return data.toString("utf8");
 }
-

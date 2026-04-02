@@ -2,21 +2,37 @@ const DEFAULT_CONTROLLER_WS_URL = "ws://127.0.0.1:4312/ws";
 const RECONNECT_DELAY_MS = 2000;
 
 let socket = null;
+let connectInFlight = false;
 let reconnectTimer = null;
 let lastControlledTabId = null;
 
 async function connect() {
-  if (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)) {
+  if (socket !== null || connectInFlight) {
     return;
   }
 
-  const url = await getControllerWsUrl();
-  socket = new WebSocket(url);
+  connectInFlight = true;
 
-  socket.addEventListener("open", handleOpen);
-  socket.addEventListener("message", handleMessage);
-  socket.addEventListener("close", handleClose);
-  socket.addEventListener("error", handleError);
+  try {
+    if (socket !== null) {
+      return;
+    }
+
+    const url = await getControllerWsUrl();
+
+    if (socket !== null) {
+      return;
+    }
+
+    socket = new WebSocket(url);
+
+    socket.addEventListener("open", handleOpen);
+    socket.addEventListener("message", handleMessage);
+    socket.addEventListener("close", handleClose);
+    socket.addEventListener("error", handleError);
+  } finally {
+    connectInFlight = false;
+  }
 }
 
 async function getControllerWsUrl() {

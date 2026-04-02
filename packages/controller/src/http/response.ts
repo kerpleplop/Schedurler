@@ -21,6 +21,7 @@ export function sendJson(
 ): void {
   response.statusCode = statusCode;
   response.setHeader("content-type", "application/json; charset=utf-8");
+  response.setHeader("cache-control", "no-store");
   response.end(JSON.stringify(payload, null, 2));
 }
 

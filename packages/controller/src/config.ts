@@ -73,7 +73,8 @@ function readPortOverride(
   return (
     readArgumentValue(argv, "port") ??
     readAssignmentValue(argv, "PORT") ??
-    env.PORT
+    env.PORT ??
+    env.npm_config_port
   );
 }
 

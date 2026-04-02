@@ -1,7 +1,6 @@
 import {
   createServer,
-  type Server,
-  type ServerResponse
+  type Server
 } from "node:http";
 import {
   type ControllerSettings,
@@ -11,6 +10,7 @@ import {
 import type { BookmarksStore } from "./storage/bookmarksStore";
 import type { ControllerStateStore } from "./storage/controllerStateStore";
 import type { SchedulesStore } from "./storage/schedulesStore";
+import { sendJson } from "./http/response";
 import { handleControllerRequest } from "./http/router";
 import { ControllerSocketServer } from "./ws/socketServer";
 
@@ -50,15 +50,22 @@ export async function startControllerServer(
     onMessage: options.onExtensionMessage
   });
 
-  await new Promise<void>((resolve) => {
-    httpServer.listen(options.settings.port, options.settings.host, resolve);
-  });
+  await listenServer(httpServer, options.settings.port, options.settings.host);
 
   return { httpServer, socketServer };
 }
 
-function sendJson(response: ServerResponse, statusCode: number, payload: unknown): void {
-  response.statusCode = statusCode;
-  response.setHeader("content-type", "application/json; charset=utf-8");
-  response.end(JSON.stringify(payload, null, 2));
+function listenServer(server: Server, port: number, host: string): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const handleError = (error: Error) => {
+      server.off("error", handleError);
+      reject(error);
+    };
+
+    server.once("error", handleError);
+    server.listen(port, host, () => {
+      server.off("error", handleError);
+      resolve();
+    });
+  });
 }

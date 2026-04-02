@@ -3,7 +3,8 @@ const state = {
   sort: "name-asc",
   keywordFilter: "__all__",
   loading: false,
-  loadingBookmarkId: null
+  loadingBookmarkId: null,
+  feedbackTone: ""
 };
 
 const elements = {
@@ -83,13 +84,13 @@ async function loadState(options = {}) {
 
     state.snapshot = await response.json();
 
-    if (!options.silent) {
+    if (!options.silent || state.feedbackTone === "error") {
       setFeedback("");
     }
 
     render();
   } catch (error) {
-    setFeedback(error instanceof Error ? error.message : String(error));
+    setFeedback(error instanceof Error ? error.message : String(error), "error");
   } finally {
     state.loading = false;
     elements.refreshButton.disabled = false;
@@ -127,7 +128,7 @@ async function loadBookmark(bookmarkId) {
 
     await loadState({ silent: true });
   } catch (error) {
-    setFeedback(error instanceof Error ? error.message : String(error));
+    setFeedback(error instanceof Error ? error.message : String(error), "error");
   } finally {
     state.loadingBookmarkId = null;
     render();
@@ -316,6 +317,7 @@ function formatTimestamp(value) {
 }
 
 function setFeedback(message, tone = "") {
+  state.feedbackTone = tone;
   elements.feedback.textContent = message;
   elements.feedback.className = tone ? `feedback ${tone}` : "feedback";
 }

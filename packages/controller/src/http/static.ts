@@ -39,6 +39,8 @@ export async function handleStaticRequest(
 
   response.statusCode = 200;
   response.setHeader("content-type", asset.contentType);
+  response.setHeader("cache-control", "no-store");
+  response.setHeader("x-content-type-options", "nosniff");
   response.end(await readFile(asset.filePath));
 
   return true;

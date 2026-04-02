@@ -13,7 +13,7 @@ export async function handleControllerRequest(
   response: ServerResponse,
   context: ControllerRequestContext
 ): Promise<void> {
-  const method = request.method ?? "GET";
+  const method = normalizeMethod(request.method);
   const url = new URL(request.url ?? "/", "http://controller.local");
 
   // The controller serves the first web UI slice same-origin so the browser app
@@ -63,6 +63,14 @@ export async function handleControllerRequest(
   }
 
   sendJson(response, 404, { error: "Not found" });
+}
+
+function normalizeMethod(method: string | undefined): string {
+  if (method === "HEAD") {
+    return "GET";
+  }
+
+  return method ?? "GET";
 }
 
 async function handleOpenUrlRequest(

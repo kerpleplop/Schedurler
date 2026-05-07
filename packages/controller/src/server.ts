@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import {
   createServer,
   type IncomingMessage,
@@ -12,10 +13,32 @@ import {
   type ExtensionToControllerMessage,
   type OpenUrlCommand
 } from "@schedurler/shared";
+import {
+  handleCreateBookmark,
+  handleUpdateBookmark,
+  handleDeleteBookmark
+} from "./api/bookmarks";
+import {
+  handleCreateSchedule,
+  handleUpdateSchedule,
+  handleDeleteSchedule,
+  handleDuplicateSchedule,
+  handleActivateSchedule,
+  handleDeactivateSchedule,
+  handleAddEvent,
+  handleUpdateEvent,
+  handleRemoveEvent
+} from "./api/schedules";
+import { handleGetState, handleSetScheduleEnabled } from "./api/state";
+import { serveStatic } from "./api/serveStatic";
 import type { BookmarksStore } from "./storage/bookmarksStore";
 import type { ControllerStateStore } from "./storage/controllerStateStore";
 import type { SchedulesStore } from "./storage/schedulesStore";
 import { ControllerSocketServer } from "./ws/socketServer";
+import { BrowserSocketServer } from "./ws/browserSocketServer";
+
+const UI_ROOT = path.resolve(__dirname, "ui");
+const BROWSER_WS_PATH = "/ws/ui";
 
 export type ControllerServerOptions = {
   settings: ControllerSettings;
@@ -29,12 +52,17 @@ export type ControllerServerOptions = {
 
 export async function startControllerServer(
   options: ControllerServerOptions
-): Promise<{ httpServer: Server; socketServer: ControllerSocketServer }> {
+): Promise<{
+  httpServer: Server;
+  socketServer: ControllerSocketServer;
+  browserSocketServer: BrowserSocketServer;
+}> {
   let socketServer: ControllerSocketServer;
+  let browserSocketServer: BrowserSocketServer;
 
   const httpServer = createServer(async (request, response) => {
     try {
-      await handleRequest(request, response, options, socketServer);
+      await handleRequest(request, response, options, socketServer, browserSocketServer);
     } catch (error) {
       console.error("[schedurler] request failed", error);
       sendJson(response, 500, { error: "Internal server error" });
@@ -47,31 +75,68 @@ export async function startControllerServer(
     onMessage: options.onExtensionMessage
   });
 
+  browserSocketServer = new BrowserSocketServer(httpServer, BROWSER_WS_PATH);
+
   await new Promise<void>((resolve) => {
     httpServer.listen(options.settings.port, options.settings.host, resolve);
   });
 
-  return { httpServer, socketServer };
+  return { httpServer, socketServer, browserSocketServer };
+}
+
+// Matches a URL pattern with named ":param" segments against a pathname.
+// Returns a record of captured values or null if the pattern doesn't match.
+function matchPath(
+  pattern: string,
+  pathname: string
+): Record<string, string> | null {
+  const patternParts = pattern.split("/");
+  const pathParts = pathname.split("/");
+
+  if (patternParts.length !== pathParts.length) {
+    return null;
+  }
+
+  const params: Record<string, string> = {};
+
+  for (let i = 0; i < patternParts.length; i++) {
+    const p = patternParts[i];
+    const v = pathParts[i];
+
+    if (p.startsWith(":")) {
+      params[p.slice(1)] = v;
+    } else if (p !== v) {
+      return null;
+    }
+  }
+
+  return params;
 }
 
 async function handleRequest(
   request: IncomingMessage,
   response: ServerResponse,
   options: ControllerServerOptions,
-  socketServer: ControllerSocketServer
+  socketServer: ControllerSocketServer,
+  browserSocketServer: BrowserSocketServer
 ): Promise<void> {
   const method = request.method ?? "GET";
   const url = new URL(request.url ?? "/", "http://controller.local");
+  const pathname = url.pathname;
 
-  if (method === "GET" && url.pathname === "/") {
-    sendJson(response, 200, {
-      name: "Schedurler controller",
-      websocketPath: options.wsPath
-    });
+  // Serve the web UI at root and /ui/*
+  if (method === "GET" && pathname === "/") {
+    await serveStatic(response, UI_ROOT, "index.html");
     return;
   }
 
-  if (method === "GET" && url.pathname === "/health") {
+  if (method === "GET" && pathname.startsWith("/ui/")) {
+    const relative = pathname.slice("/ui/".length);
+    await serveStatic(response, UI_ROOT, relative);
+    return;
+  }
+
+  if (method === "GET" && pathname === "/health") {
     sendJson(response, 200, {
       ok: true,
       controllerId: options.stateRef.current.controllerId,
@@ -80,21 +145,199 @@ async function handleRequest(
     return;
   }
 
-  if (method === "GET" && url.pathname === "/api/bookmarks") {
+  // --- Bookmarks ---
+
+  if (method === "GET" && pathname === "/api/bookmarks") {
     sendJson(response, 200, {
       bookmarks: await options.bookmarksStore.list()
     });
     return;
   }
 
-  if (method === "GET" && url.pathname === "/api/schedules") {
+  if (method === "POST" && pathname === "/api/bookmarks") {
+    await handleCreateBookmark(request, response, {
+      bookmarksStore: options.bookmarksStore,
+      schedulesStore: options.schedulesStore,
+      browserSocketServer
+    });
+    return;
+  }
+
+  {
+    const params = matchPath("/api/bookmarks/:id", pathname);
+    if (params) {
+      if (method === "PATCH") {
+        await handleUpdateBookmark(request, response, params.id, {
+          bookmarksStore: options.bookmarksStore,
+          schedulesStore: options.schedulesStore,
+          browserSocketServer
+        });
+        return;
+      }
+      if (method === "DELETE") {
+        await handleDeleteBookmark(response, params.id, {
+          bookmarksStore: options.bookmarksStore,
+          schedulesStore: options.schedulesStore,
+          browserSocketServer
+        });
+        return;
+      }
+    }
+  }
+
+  // --- Schedules ---
+
+  if (method === "GET" && pathname === "/api/schedules") {
     sendJson(response, 200, {
       schedules: await options.schedulesStore.list()
     });
     return;
   }
 
-  if (method === "POST" && url.pathname === "/api/commands/open-url") {
+  if (method === "POST" && pathname === "/api/schedules") {
+    await handleCreateSchedule(request, response, {
+      schedulesStore: options.schedulesStore,
+      controllerStateStore: options.controllerStateStore,
+      stateRef: options.stateRef,
+      browserSocketServer,
+      getExtensionConnectionCount: () => socketServer.getConnectionCount()
+    });
+    return;
+  }
+
+  {
+    const params = matchPath("/api/schedules/:id", pathname);
+    if (params) {
+      if (method === "PATCH") {
+        await handleUpdateSchedule(request, response, params.id, {
+          schedulesStore: options.schedulesStore,
+          controllerStateStore: options.controllerStateStore,
+          stateRef: options.stateRef,
+          browserSocketServer,
+          getExtensionConnectionCount: () => socketServer.getConnectionCount()
+        });
+        return;
+      }
+      if (method === "DELETE") {
+        await handleDeleteSchedule(response, params.id, {
+          schedulesStore: options.schedulesStore,
+          controllerStateStore: options.controllerStateStore,
+          stateRef: options.stateRef,
+          browserSocketServer,
+          getExtensionConnectionCount: () => socketServer.getConnectionCount()
+        });
+        return;
+      }
+    }
+  }
+
+  {
+    const params = matchPath("/api/schedules/:id/duplicate", pathname);
+    if (params && method === "POST") {
+      await handleDuplicateSchedule(response, params.id, {
+        schedulesStore: options.schedulesStore,
+        controllerStateStore: options.controllerStateStore,
+        stateRef: options.stateRef,
+        browserSocketServer,
+        getExtensionConnectionCount: () => socketServer.getConnectionCount()
+      });
+      return;
+    }
+  }
+
+  {
+    const params = matchPath("/api/schedules/:id/activate", pathname);
+    if (params && method === "POST") {
+      await handleActivateSchedule(response, params.id, {
+        schedulesStore: options.schedulesStore,
+        controllerStateStore: options.controllerStateStore,
+        stateRef: options.stateRef,
+        browserSocketServer,
+        getExtensionConnectionCount: () => socketServer.getConnectionCount()
+      });
+      return;
+    }
+  }
+
+  {
+    const params = matchPath("/api/schedules/:id/deactivate", pathname);
+    if (params && method === "POST") {
+      await handleDeactivateSchedule(response, params.id, {
+        schedulesStore: options.schedulesStore,
+        controllerStateStore: options.controllerStateStore,
+        stateRef: options.stateRef,
+        browserSocketServer,
+        getExtensionConnectionCount: () => socketServer.getConnectionCount()
+      });
+      return;
+    }
+  }
+
+  {
+    const params = matchPath("/api/schedules/:id/events", pathname);
+    if (params && method === "POST") {
+      await handleAddEvent(request, response, params.id, {
+        schedulesStore: options.schedulesStore,
+        controllerStateStore: options.controllerStateStore,
+        stateRef: options.stateRef,
+        browserSocketServer,
+        getExtensionConnectionCount: () => socketServer.getConnectionCount()
+      });
+      return;
+    }
+  }
+
+  {
+    const params = matchPath("/api/schedules/:scheduleId/events/:eventId", pathname);
+    if (params) {
+      if (method === "PATCH") {
+        await handleUpdateEvent(request, response, params.scheduleId, params.eventId, {
+          schedulesStore: options.schedulesStore,
+          controllerStateStore: options.controllerStateStore,
+          stateRef: options.stateRef,
+          browserSocketServer,
+          getExtensionConnectionCount: () => socketServer.getConnectionCount()
+        });
+        return;
+      }
+      if (method === "DELETE") {
+        await handleRemoveEvent(response, params.scheduleId, params.eventId, {
+          schedulesStore: options.schedulesStore,
+          controllerStateStore: options.controllerStateStore,
+          stateRef: options.stateRef,
+          browserSocketServer,
+          getExtensionConnectionCount: () => socketServer.getConnectionCount()
+        });
+        return;
+      }
+    }
+  }
+
+  // --- Controller state ---
+
+  if (method === "GET" && pathname === "/api/state") {
+    handleGetState(response, {
+      controllerStateStore: options.controllerStateStore,
+      stateRef: options.stateRef,
+      browserSocketServer,
+      getExtensionConnectionCount: () => socketServer.getConnectionCount()
+    });
+    return;
+  }
+
+  if (method === "POST" && pathname === "/api/state/schedule-enabled") {
+    await handleSetScheduleEnabled(request, response, {
+      controllerStateStore: options.controllerStateStore,
+      stateRef: options.stateRef,
+      browserSocketServer,
+      getExtensionConnectionCount: () => socketServer.getConnectionCount()
+    });
+    return;
+  }
+
+  // --- Existing command endpoint ---
+
+  if (method === "POST" && pathname === "/api/commands/open-url") {
     const body = await readJsonBody(request);
     const urlValue = isRecord(body) && typeof body.url === "string" ? body.url : null;
     const bookmarkId =
@@ -137,6 +380,12 @@ async function handleRequest(
     };
 
     await options.controllerStateStore.save(options.stateRef.current);
+
+    browserSocketServer.broadcast({
+      type: "state_update",
+      state: options.stateRef.current,
+      extensionConnections: socketServer.getConnectionCount()
+    });
 
     sendJson(response, 202, { ok: true, commandId: command.commandId });
     return;
@@ -193,4 +442,3 @@ function isValidUrl(value: string): boolean {
     return false;
   }
 }
-

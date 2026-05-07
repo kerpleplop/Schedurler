@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Schedurler</title>
+  <link rel="stylesheet" href="/ui/style.css" />
+</head>
+<body>
+  <header id="status-bar">
+    <span id="app-name">Schedurler</span>
+    <span id="status-extension">Extensions: <strong id="extension-count">—</strong></span>
+    <span id="status-schedule">Schedule: <strong id="active-schedule-name">none</strong></span>
+    <span id="status-tab-action"></span>
+  </header>
+
+  <nav id="main-nav">
+    <button class="nav-tab active" data-section="bookmarks">Bookmarks</button>
+    <button class="nav-tab" data-section="schedules">Schedules</button>
+  </nav>
+
+  <main>
+    <section id="section-bookmarks"></section>
+    <section id="section-schedules" hidden></section>
+  </main>
+
+  <script type="module" src="/ui/app.js"></script>
+</body>
+</html>

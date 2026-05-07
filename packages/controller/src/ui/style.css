@@ -124,6 +124,48 @@ button.btn-danger:hover { background: #fff0f0; }
 .event-info { font-size: 13px; }
 .event-info code { font-size: 12px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; }
 
+/* Logs */
+.logs-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.logs-toolbar h2 { margin: 0; }
+
+.log-list {
+  list-style: none;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  padding: 0.4rem 0;
+}
+.log-entry {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.15rem 0.6rem;
+}
+.log-entry:hover { background: #f7f7f7; }
+.log-time { color: #999; flex-shrink: 0; }
+.log-level {
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  width: 2.8rem;
+}
+.log-msg { color: #1a1a1a; word-break: break-word; }
+
+.log-info .log-level { color: #555; }
+.log-warn .log-level { color: #b66000; }
+.log-warn .log-msg  { color: #b66000; }
+.log-error .log-level { color: #c00; }
+.log-error .log-msg  { color: #c00; }
+
 /* Misc */
 .empty { color: #888; font-size: 13px; margin: 0.5rem 0; }
 .empty.small { font-size: 12px; }

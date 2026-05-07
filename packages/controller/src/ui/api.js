@@ -32,6 +32,9 @@ export const addEvent = (scheduleId, data) => request("POST", `/api/schedules/${
 export const updateEvent = (scheduleId, eventId, patch) => request("PATCH", `/api/schedules/${scheduleId}/events/${eventId}`, patch).then(d => d.schedule);
 export const deleteEvent = (scheduleId, eventId) => request("DELETE", `/api/schedules/${scheduleId}/events/${eventId}`).then(d => d.schedule);
 
+// Logs
+export const getLogs = () => request("GET", "/api/logs").then(d => d.logs);
+
 // State
 export const getState = () => request("GET", "/api/state");
 export const setScheduleEnabled = (enabled) => request("POST", "/api/state/schedule-enabled", { enabled });

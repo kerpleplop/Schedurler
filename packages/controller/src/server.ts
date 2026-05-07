@@ -13,6 +13,7 @@ import {
   type ExtensionToControllerMessage,
   type OpenUrlCommand
 } from "@schedurler/shared";
+import type { LogEntry } from "./logBuffer";
 import {
   handleCreateBookmark,
   handleUpdateBookmark,
@@ -48,6 +49,8 @@ export type ControllerServerOptions = {
   schedulesStore: SchedulesStore;
   controllerStateStore: ControllerStateStore;
   onExtensionMessage: (message: ExtensionToControllerMessage) => Promise<void>;
+  onExtensionClose: () => void;
+  getLogs: () => readonly LogEntry[];
 };
 
 export async function startControllerServer(
@@ -70,7 +73,8 @@ export async function startControllerServer(
   });
 
   socketServer = new ControllerSocketServer({
-    onMessage: options.onExtensionMessage
+    onMessage: options.onExtensionMessage,
+    onClose: options.onExtensionClose
   });
 
   browserSocketServer = new BrowserSocketServer();
@@ -142,6 +146,11 @@ async function handleRequest(
   if (method === "GET" && pathname.startsWith("/ui/")) {
     const relative = pathname.slice("/ui/".length);
     await serveStatic(response, UI_ROOT, relative);
+    return;
+  }
+
+  if (method === "GET" && pathname === "/api/logs") {
+    sendJson(response, 200, { logs: options.getLogs() });
     return;
   }
 

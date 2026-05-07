@@ -9,6 +9,7 @@ import { WebSocket, WebSocketServer, type RawData } from "ws";
 
 export type ControllerSocketServerOptions = {
   onMessage: (message: ExtensionToControllerMessage) => Promise<void> | void;
+  onClose: () => void;
 };
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
@@ -36,6 +37,7 @@ export class ControllerSocketServer {
 
       socket.on("close", () => {
         this.sockets.delete(socket);
+        options.onClose();
       });
 
       socket.on("error", (error) => {

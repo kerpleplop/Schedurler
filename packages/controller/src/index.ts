@@ -4,6 +4,8 @@ import type {
   ExtensionToControllerMessage
 } from "@schedurler/shared";
 import { loadControllerConfig, persistResolvedSettings } from "./config";
+import { LogBuffer } from "./logBuffer";
+import { ScheduleRunner } from "./scheduler";
 import { startControllerServer } from "./server";
 import { BookmarksStore } from "./storage/bookmarksStore";
 import { ControllerStateStore } from "./storage/controllerStateStore";
@@ -30,6 +32,12 @@ async function main(): Promise<void> {
     current: await controllerStateStore.loadOrCreate(createDefaultState())
   };
 
+  const logBuffer = new LogBuffer();
+
+  // Declared before startControllerServer so closures below can reference it.
+  // Assigned immediately after, before any callback can fire.
+  let log: (level: "info" | "warn" | "error", message: string) => void = () => {};
+
   const { socketServer, browserSocketServer } = await startControllerServer({
     settings,
     wsPath,
@@ -37,15 +45,40 @@ async function main(): Promise<void> {
     bookmarksStore,
     schedulesStore,
     controllerStateStore,
+    getLogs: () => logBuffer.getAll(),
     onExtensionMessage: async (message) => {
       await handleExtensionMessage(
         message,
         stateRef,
         controllerStateStore,
         socketServer,
-        browserSocketServer
+        browserSocketServer,
+        log
       );
+    },
+    onExtensionClose: () => {
+      log("info", "Extension disconnected");
+      browserSocketServer.broadcast({
+        type: "state_update",
+        state: stateRef.current,
+        extensionConnections: socketServer.getConnectionCount()
+      });
     }
+  });
+
+  log = (level, message) => {
+    const entry = logBuffer.add(level, message);
+    browserSocketServer.broadcast({ type: "log_entry", entry });
+  };
+
+  new ScheduleRunner({
+    stateRef,
+    schedulesStore,
+    bookmarksStore,
+    socketServer,
+    controllerStateStore,
+    browserSocketServer,
+    onLog: log
   });
 
   const base = `http://${settings.host}:${settings.port}`;
@@ -75,13 +108,12 @@ async function handleExtensionMessage(
   stateRef: { current: ControllerState },
   controllerStateStore: ControllerStateStore,
   socketServer: ControllerSocketServer,
-  browserSocketServer: BrowserSocketServer
+  browserSocketServer: BrowserSocketServer,
+  log: (level: "info" | "warn" | "error", message: string) => void
 ): Promise<void> {
   switch (message.type) {
     case "hello":
-      console.log(
-        `[schedurler] extension connected (${message.browser}) ${message.version ?? ""}`.trim()
-      );
+      log("info", `Extension connected: ${message.browser} v${message.version ?? "unknown"}`);
       browserSocketServer.broadcast({
         type: "state_update",
         state: stateRef.current,

@@ -1,5 +1,6 @@
 import * as bookmarksSection from "./bookmarks.js";
 import * as schedulesSection from "./schedules.js";
+import * as logsSection from "./logs.js";
 import * as api from "./api.js";
 
 const extensionCountEl = document.getElementById("extension-count");
@@ -14,7 +15,8 @@ let allBookmarks = [];
 const navTabs = document.querySelectorAll(".nav-tab");
 const sections = {
   bookmarks: document.getElementById("section-bookmarks"),
-  schedules: document.getElementById("section-schedules")
+  schedules: document.getElementById("section-schedules"),
+  logs: document.getElementById("section-logs")
 };
 
 navTabs.forEach((tab) => {
@@ -76,6 +78,8 @@ function connect() {
     } else if (msg.type === "schedules_updated") {
       allSchedules = msg.schedules;
       schedulesSection.setSchedules(allSchedules);
+    } else if (msg.type === "log_entry") {
+      logsSection.appendEntry(msg.entry);
     }
   });
 
@@ -97,10 +101,11 @@ function connect() {
 
 async function init() {
   try {
-    const [stateData, fetchedBookmarks, fetchedSchedules] = await Promise.all([
+    const [stateData, fetchedBookmarks, fetchedSchedules, logsData] = await Promise.all([
       api.getState(),
       api.listBookmarks(),
-      api.listSchedules()
+      api.listSchedules(),
+      api.getLogs()
     ]);
 
     allBookmarks = fetchedBookmarks;
@@ -110,6 +115,7 @@ async function init() {
 
     await bookmarksSection.init(allBookmarks);
     await schedulesSection.init(allBookmarks);
+    logsSection.init(logsData);
 
     connect();
   } catch (err) {

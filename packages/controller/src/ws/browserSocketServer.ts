@@ -2,11 +2,13 @@ import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import type { ControllerState } from "@schedurler/shared";
 import { WebSocket, WebSocketServer } from "ws";
+import type { LogEntry } from "../logBuffer";
 
 export type BrowserEvent =
   | { type: "state_update"; state: ControllerState; extensionConnections: number }
   | { type: "bookmarks_updated"; bookmarks: unknown[] }
-  | { type: "schedules_updated"; schedules: unknown[] };
+  | { type: "schedules_updated"; schedules: unknown[] }
+  | { type: "log_entry"; entry: LogEntry };
 
 export class BrowserSocketServer {
   private readonly wss: WebSocketServer;

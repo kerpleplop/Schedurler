@@ -1,4 +1,5 @@
-import type { Server as HttpServer } from "node:http";
+import type { IncomingMessage } from "node:http";
+import type { Duplex } from "node:stream";
 import type { ControllerState } from "@schedurler/shared";
 import { WebSocket, WebSocketServer } from "ws";
 
@@ -11,8 +12,8 @@ export class BrowserSocketServer {
   private readonly wss: WebSocketServer;
   private readonly sockets = new Set<WebSocket>();
 
-  constructor(server: HttpServer, path: string) {
-    this.wss = new WebSocketServer({ server, path });
+  constructor() {
+    this.wss = new WebSocketServer({ noServer: true });
 
     this.wss.on("connection", (socket) => {
       this.sockets.add(socket);
@@ -24,6 +25,12 @@ export class BrowserSocketServer {
       socket.on("error", (error) => {
         console.error("[schedurler] browser websocket error", error);
       });
+    });
+  }
+
+  handleUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
+    this.wss.handleUpgrade(request, socket, head, (ws) => {
+      this.wss.emit("connection", ws, request);
     });
   }
 

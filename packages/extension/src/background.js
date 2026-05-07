@@ -2,15 +2,22 @@ const DEFAULT_CONTROLLER_WS_URL = "ws://127.0.0.1:4312/ws";
 const RECONNECT_DELAY_MS = 2000;
 
 let socket = null;
+let isConnecting = false;
 let reconnectTimer = null;
 let lastControlledTabId = null;
 
 async function connect() {
+  if (isConnecting) {
+    return;
+  }
+
   if (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)) {
     return;
   }
 
+  isConnecting = true;
   const url = await getControllerWsUrl();
+  isConnecting = false;
   socket = new WebSocket(url);
 
   socket.addEventListener("open", handleOpen);

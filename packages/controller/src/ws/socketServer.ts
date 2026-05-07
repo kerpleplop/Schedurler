@@ -1,4 +1,5 @@
-import type { Server as HttpServer } from "node:http";
+import type { IncomingMessage } from "node:http";
+import type { Duplex } from "node:stream";
 import {
   isExtensionToControllerMessage,
   type ControllerToExtensionMessage,
@@ -7,25 +8,27 @@ import {
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 
 export type ControllerSocketServerOptions = {
-  server: HttpServer;
-  path: string;
   onMessage: (message: ExtensionToControllerMessage) => Promise<void> | void;
 };
+
+const HEARTBEAT_INTERVAL_MS = 15_000;
 
 export class ControllerSocketServer {
   private readonly wss: WebSocketServer;
   private readonly sockets = new Set<WebSocket>();
+  private readonly alive = new WeakSet<WebSocket>();
   private readonly onMessage: ControllerSocketServerOptions["onMessage"];
+  private readonly heartbeat: ReturnType<typeof setInterval>;
 
   constructor(options: ControllerSocketServerOptions) {
     this.onMessage = options.onMessage;
-    this.wss = new WebSocketServer({
-      server: options.server,
-      path: options.path
-    });
+    this.wss = new WebSocketServer({ noServer: true });
 
     this.wss.on("connection", (socket) => {
+      this.alive.add(socket);
       this.sockets.add(socket);
+
+      socket.on("pong", () => this.alive.add(socket));
 
       socket.on("message", async (data) => {
         await this.handleMessage(data);
@@ -38,6 +41,26 @@ export class ControllerSocketServer {
       socket.on("error", (error) => {
         console.error("[schedurler] websocket client error", error);
       });
+    });
+
+    this.heartbeat = setInterval(() => {
+      for (const socket of this.sockets) {
+        if (!this.alive.has(socket)) {
+          socket.terminate();
+          this.sockets.delete(socket);
+          continue;
+        }
+        this.alive.delete(socket);
+        socket.ping();
+      }
+    }, HEARTBEAT_INTERVAL_MS);
+
+    this.wss.on("close", () => clearInterval(this.heartbeat));
+  }
+
+  handleUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
+    this.wss.handleUpgrade(request, socket, head, (ws) => {
+      this.wss.emit("connection", ws, request);
     });
   }
 

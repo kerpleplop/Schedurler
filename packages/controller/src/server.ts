@@ -70,12 +70,21 @@ export async function startControllerServer(
   });
 
   socketServer = new ControllerSocketServer({
-    server: httpServer,
-    path: options.wsPath,
     onMessage: options.onExtensionMessage
   });
 
-  browserSocketServer = new BrowserSocketServer(httpServer, BROWSER_WS_PATH);
+  browserSocketServer = new BrowserSocketServer();
+
+  httpServer.on("upgrade", (request, socket, head) => {
+    const pathname = new URL(request.url ?? "/", "http://controller.local").pathname;
+    if (pathname === options.wsPath) {
+      socketServer.handleUpgrade(request, socket, head);
+    } else if (pathname === BROWSER_WS_PATH) {
+      browserSocketServer.handleUpgrade(request, socket, head);
+    } else {
+      socket.destroy();
+    }
+  });
 
   await new Promise<void>((resolve) => {
     httpServer.listen(options.settings.port, options.settings.host, resolve);

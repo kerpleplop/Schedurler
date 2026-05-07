@@ -6,9 +6,9 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc -b packages/shared packages/controller",
+    "build": "tsc -b packages/shared packages/controller && node -e \"require('fs').cpSync('packages/controller/src/ui','packages/controller/dist/ui',{recursive:true})\"",
     "build:shared": "tsc -b packages/shared",
-    "build:controller": "tsc -b packages/controller",
+    "build:controller": "tsc -b packages/controller && node -e \"require('fs').cpSync('packages/controller/src/ui','packages/controller/dist/ui',{recursive:true})\""  ,
     "dev:controller": "npm run build:shared && tsx packages/controller/src/index.ts",
     "start:controller": "npm run build && node packages/controller/dist/index.js"
   },

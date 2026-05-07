@@ -9,6 +9,8 @@ import { BookmarksStore } from "./storage/bookmarksStore";
 import { ControllerStateStore } from "./storage/controllerStateStore";
 import { SchedulesStore } from "./storage/schedulesStore";
 import { resolveStoragePaths } from "./storage/paths";
+import type { ControllerSocketServer } from "./ws/socketServer";
+import type { BrowserSocketServer } from "./ws/browserSocketServer";
 
 async function main(): Promise<void> {
   const { settings, wsPath } = loadControllerConfig();
@@ -28,7 +30,7 @@ async function main(): Promise<void> {
     current: await controllerStateStore.loadOrCreate(createDefaultState())
   };
 
-  await startControllerServer({
+  const { socketServer, browserSocketServer } = await startControllerServer({
     settings,
     wsPath,
     stateRef,
@@ -36,16 +38,20 @@ async function main(): Promise<void> {
     schedulesStore,
     controllerStateStore,
     onExtensionMessage: async (message) => {
-      await handleExtensionMessage(message, stateRef, controllerStateStore);
+      await handleExtensionMessage(
+        message,
+        stateRef,
+        controllerStateStore,
+        socketServer,
+        browserSocketServer
+      );
     }
   });
 
-  console.log(
-    `[schedurler] controller listening on http://${settings.host}:${settings.port}`
-  );
-  console.log(
-    `[schedurler] websocket endpoint ws://${settings.host}:${settings.port}${wsPath}`
-  );
+  const base = `http://${settings.host}:${settings.port}`;
+  console.log(`[schedurler] controller listening on ${base}`);
+  console.log(`[schedurler] web UI available at ${base}/`);
+  console.log(`[schedurler] websocket endpoint ws://${settings.host}:${settings.port}${wsPath}`);
 }
 
 function createDefaultState(): ControllerState {
@@ -67,13 +73,20 @@ function createDefaultState(): ControllerState {
 async function handleExtensionMessage(
   message: ExtensionToControllerMessage,
   stateRef: { current: ControllerState },
-  controllerStateStore: ControllerStateStore
+  controllerStateStore: ControllerStateStore,
+  socketServer: ControllerSocketServer,
+  browserSocketServer: BrowserSocketServer
 ): Promise<void> {
   switch (message.type) {
     case "hello":
       console.log(
         `[schedurler] extension connected (${message.browser}) ${message.version ?? ""}`.trim()
       );
+      browserSocketServer.broadcast({
+        type: "state_update",
+        state: stateRef.current,
+        extensionConnections: socketServer.getConnectionCount()
+      });
       return;
     case "tab_opened":
       stateRef.current = {
@@ -118,10 +131,15 @@ async function handleExtensionMessage(
   }
 
   await controllerStateStore.save(stateRef.current);
+
+  browserSocketServer.broadcast({
+    type: "state_update",
+    state: stateRef.current,
+    extensionConnections: socketServer.getConnectionCount()
+  });
 }
 
 main().catch((error) => {
   console.error("[schedurler] controller failed to start", error);
   process.exitCode = 1;
 });
-

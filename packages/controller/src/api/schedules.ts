@@ -133,7 +133,7 @@ export async function handleActivateSchedule(
     return;
   }
 
-  deps.stateRef.current = { ...deps.stateRef.current, activeScheduleId: id };
+  deps.stateRef.current = { ...deps.stateRef.current, activeScheduleId: id, scheduleEnabled: true };
   await deps.controllerStateStore.save(deps.stateRef.current);
   deps.browserSocketServer.broadcast({
     type: "state_update",
@@ -156,7 +156,7 @@ export async function handleDeactivateSchedule(
     return;
   }
 
-  deps.stateRef.current = { ...deps.stateRef.current, activeScheduleId: null };
+  deps.stateRef.current = { ...deps.stateRef.current, activeScheduleId: null, scheduleEnabled: false };
   await deps.controllerStateStore.save(deps.stateRef.current);
   deps.browserSocketServer.broadcast({
     type: "state_update",

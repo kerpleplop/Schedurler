@@ -71,6 +71,7 @@ function connect() {
 
     if (msg.type === "state_update") {
       updateStatusBar(msg.state, msg.extensionConnections);
+      schedulesSection.setActiveScheduleId(msg.state.activeScheduleId);
     } else if (msg.type === "bookmarks_updated") {
       allBookmarks = msg.bookmarks;
       bookmarksSection.setBookmarks(allBookmarks);
@@ -115,6 +116,7 @@ async function init() {
 
     await bookmarksSection.init(allBookmarks);
     await schedulesSection.init(allBookmarks);
+    schedulesSection.setActiveScheduleId(stateData.state.activeScheduleId);
     logsSection.init(logsData);
 
     connect();

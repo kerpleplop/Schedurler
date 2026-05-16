@@ -18,6 +18,7 @@ export type OpenUrlCommand = ControllerCommandBase & {
   type: "open_url";
   url: string;
   source: ActiveTabActionSource;
+  tabId?: number; // if present, update this tab's URL instead of opening a new tab
 };
 
 export type CloseTabCommand = ControllerCommandBase & {
@@ -39,12 +40,17 @@ export type GetStatusCommand = ControllerCommandBase & {
   type: "get_status";
 };
 
+export type GetTabsCommand = ControllerCommandBase & {
+  type: "get_tabs";
+};
+
 export type ControllerToExtensionMessage =
   | OpenUrlCommand
   | CloseTabCommand
   | MuteTabCommand
   | UnmuteTabCommand
-  | GetStatusCommand;
+  | GetStatusCommand
+  | GetTabsCommand;
 
 export type ExtensionHello = {
   type: "hello";
@@ -81,9 +87,28 @@ export type CommandFailedEvent = {
   observedAt: string;
 };
 
+export type TabClosedEvent = {
+  type: "tab_closed";
+  tabId: number;
+  observedAt: string;
+};
+
+export type TabsStateEvent = {
+  type: "tabs_state";
+  tabs: Array<{
+    tabId: number;
+    url: string;
+    title?: string;
+    favIconUrl?: string;
+  }>;
+  observedAt: string;
+};
+
 export type ExtensionToControllerMessage =
   | ExtensionHello
   | ExtensionStatus
   | TabOpenedEvent
-  | CommandFailedEvent;
+  | CommandFailedEvent
+  | TabClosedEvent
+  | TabsStateEvent;
 

@@ -105,6 +105,12 @@ export function isControllerState(value: unknown): value is ControllerState {
     return false;
   }
 
+  // scheduleTabId may be absent in older persisted state — treat as null
+  const hasValidScheduleTabId =
+    value.scheduleTabId === undefined ||
+    value.scheduleTabId === null ||
+    Number.isInteger(value.scheduleTabId);
+
   return (
     typeof value.controllerId === "string" &&
     (value.activeScheduleId === null ||
@@ -112,7 +118,8 @@ export function isControllerState(value: unknown): value is ControllerState {
     typeof value.scheduleEnabled === "boolean" &&
     (value.currentBookmarkId === null ||
       typeof value.currentBookmarkId === "string") &&
-    isActiveTabAction(value.activeTabAction)
+    isActiveTabAction(value.activeTabAction) &&
+    hasValidScheduleTabId
   );
 }
 
@@ -160,13 +167,15 @@ export function isControllerToExtensionMessage(
         typeof value.url === "string" &&
         (value.source === "manual" ||
           value.source === "schedule" ||
-          value.source === "system")
+          value.source === "system") &&
+        (value.tabId === undefined || Number.isInteger(value.tabId))
       );
     case "close_tab":
     case "mute_tab":
     case "unmute_tab":
       return value.tabId === undefined || Number.isInteger(value.tabId);
     case "get_status":
+    case "get_tabs":
       return true;
     default:
       return false;
@@ -232,6 +241,24 @@ export function isExtensionToControllerMessage(
           typeof value.bookmarkId === "string") &&
         typeof value.errorMessage === "string" &&
         typeof value.observedAt === "string"
+      );
+    case "tab_closed":
+      return (
+        Number.isInteger(value.tabId) &&
+        typeof value.observedAt === "string"
+      );
+    case "tabs_state":
+      return (
+        Array.isArray(value.tabs) &&
+        typeof value.observedAt === "string" &&
+        value.tabs.every(
+          (t: unknown) =>
+            isRecord(t) &&
+            Number.isInteger(t.tabId) &&
+            typeof t.url === "string" &&
+            (t.title === undefined || typeof t.title === "string") &&
+            (t.favIconUrl === undefined || typeof t.favIconUrl === "string")
+        )
       );
     default:
       return false;

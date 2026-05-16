@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { ControllerState, OpenUrlCommand } from "@schedurler/shared";
+import type {
+  Bookmark,
+  CloseTabCommand,
+  ControllerState,
+  OpenUrlCommand,
+  Schedule,
+  ScheduleEvent
+} from "@schedurler/shared";
 import type { BookmarksStore } from "./storage/bookmarksStore";
 import type { ControllerStateStore } from "./storage/controllerStateStore";
 import type { SchedulesStore } from "./storage/schedulesStore";
@@ -18,6 +25,30 @@ export type ScheduleRunnerOptions = {
   browserSocketServer: BrowserSocketServer;
   onLog: (level: LogLevel, message: string) => void;
 };
+
+/** Convert a HH:MM string to total minutes since midnight. */
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+/**
+ * Find the event that should have most recently fired at or before the given
+ * time. If all events are in the future (none have fired yet today), wraps
+ * around and returns the latest event in the 24-hour cycle — this represents
+ * "yesterday's last event", which would have been the current bookmark.
+ */
+function findLastEvent(events: ScheduleEvent[], currentMinutes: number): ScheduleEvent | null {
+  const enabled = events.filter((e) => e.enabled);
+  if (enabled.length === 0) return null;
+
+  const past = enabled.filter((e) => timeToMinutes(e.time) <= currentMinutes);
+
+  const pool = past.length > 0 ? past : enabled;
+  return pool.reduce((latest, e) =>
+    timeToMinutes(e.time) > timeToMinutes(latest.time) ? e : latest
+  );
+}
 
 export class ScheduleRunner {
   private readonly options: ScheduleRunnerOptions;
@@ -43,15 +74,7 @@ export class ScheduleRunner {
     if (minute === this.lastFiredMinute) return;
     this.lastFiredMinute = minute;
 
-    const {
-      stateRef,
-      schedulesStore,
-      bookmarksStore,
-      socketServer,
-      controllerStateStore,
-      browserSocketServer,
-      onLog
-    } = this.options;
+    const { stateRef, schedulesStore, bookmarksStore } = this.options;
 
     if (!stateRef.current.scheduleEnabled || !stateRef.current.activeScheduleId) return;
 
@@ -65,51 +88,116 @@ export class ScheduleRunner {
     const bookmarks = await bookmarksStore.list();
 
     for (const event of matchingEvents) {
-      const bookmark = bookmarks.find((b) => b.id === event.bookmarkId);
+      await this.fireEvent(active, event, bookmarks);
+    }
+  }
 
-      if (!bookmark) {
-        onLog("error", `Schedule "${active.name}": event at ${minute} references missing bookmark ${event.bookmarkId}`);
-        continue;
-      }
+  /**
+   * Immediately fire the most-recently-due event for the given schedule.
+   * Called when a schedule is activated so it opens the right bookmark right away.
+   */
+  async activateNow(schedule: Schedule): Promise<void> {
+    const { bookmarksStore } = this.options;
 
-      const command: OpenUrlCommand = {
-        type: "open_url",
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const event = findLastEvent(schedule.events, currentMinutes);
+    if (!event) return;
+
+    const bookmarks = await bookmarksStore.list();
+    await this.fireEvent(schedule, event, bookmarks);
+  }
+
+  /**
+   * Close the dedicated schedule tab (if one exists).
+   * Called when a schedule is deactivated.
+   */
+  deactivateNow(): void {
+    const { stateRef, socketServer, onLog } = this.options;
+    const tabId = stateRef.current.scheduleTabId;
+
+    if (tabId !== null) {
+      const command: CloseTabCommand = {
+        type: "close_tab",
         commandId: randomUUID(),
         sentAt: new Date().toISOString(),
-        url: bookmark.url,
-        bookmarkId: bookmark.id,
-        source: "schedule"
+        tabId
       };
-
       const sent = socketServer.sendCommand(command);
-
-      if (!sent) {
-        onLog("warn", `Schedule "${active.name}": ${minute} — no extension connected, skipped "${bookmark.name}"`);
-        continue;
+      if (sent) {
+        onLog("info", "Schedule deactivated: closed tab");
       }
-
-      onLog("info", `Schedule "${active.name}": fired "${bookmark.name}" at ${minute}`);
-
-      stateRef.current = {
-        ...stateRef.current,
-        currentBookmarkId: bookmark.id,
-        activeTabAction: {
-          bookmarkId: bookmark.id,
-          url: bookmark.url,
-          startedAt: command.sentAt,
-          source: "schedule",
-          status: "pending"
-        }
-      };
-
-      await controllerStateStore.save(stateRef.current);
-
-      browserSocketServer.broadcast({
-        type: "state_update",
-        state: stateRef.current,
-        extensionConnections: socketServer.getConnectionCount()
-      });
     }
+  }
+
+  /** Send an open/update command for one schedule event and update state. */
+  private async fireEvent(
+    schedule: Schedule,
+    event: ScheduleEvent,
+    bookmarks: Bookmark[]
+  ): Promise<void> {
+    const {
+      stateRef,
+      socketServer,
+      controllerStateStore,
+      browserSocketServer,
+      onLog
+    } = this.options;
+
+    const bookmark = bookmarks.find((b) => b.id === event.bookmarkId);
+
+    if (!bookmark) {
+      onLog(
+        "error",
+        `Schedule "${schedule.name}": event at ${event.time} references missing bookmark ${event.bookmarkId}`
+      );
+      return;
+    }
+
+    const existingTabId = stateRef.current.scheduleTabId ?? undefined;
+
+    const command: OpenUrlCommand = {
+      type: "open_url",
+      commandId: randomUUID(),
+      sentAt: new Date().toISOString(),
+      url: bookmark.url,
+      bookmarkId: bookmark.id,
+      source: "schedule",
+      ...(existingTabId !== undefined ? { tabId: existingTabId } : {})
+    };
+
+    const sent = socketServer.sendCommand(command);
+
+    if (!sent) {
+      onLog(
+        "warn",
+        `Schedule "${schedule.name}": ${event.time} — no extension connected, skipped "${bookmark.name}"`
+      );
+      return;
+    }
+
+    const action = existingTabId !== undefined ? "updated tab to" : "opened";
+    onLog("info", `Schedule "${schedule.name}": ${action} "${bookmark.name}" at ${event.time}`);
+
+    stateRef.current = {
+      ...stateRef.current,
+      currentBookmarkId: bookmark.id,
+      activeTabAction: {
+        bookmarkId: bookmark.id,
+        url: bookmark.url,
+        startedAt: command.sentAt,
+        source: "schedule",
+        status: "pending"
+      }
+    };
+
+    await controllerStateStore.save(stateRef.current);
+
+    browserSocketServer.broadcast({
+      type: "state_update",
+      state: stateRef.current,
+      extensionConnections: socketServer.getConnectionCount()
+    });
   }
 
   stop(): void {

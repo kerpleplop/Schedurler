@@ -1,5 +1,6 @@
 import * as bookmarksSection from "./bookmarks.js";
 import * as schedulesSection from "./schedules.js";
+import * as tabsSection from "./tabs.js";
 import * as logsSection from "./logs.js";
 import * as api from "./api.js";
 
@@ -16,6 +17,7 @@ const navTabs = document.querySelectorAll(".nav-tab");
 const sections = {
   bookmarks: document.getElementById("section-bookmarks"),
   schedules: document.getElementById("section-schedules"),
+  tabs: document.getElementById("section-tabs"),
   logs: document.getElementById("section-logs")
 };
 
@@ -36,9 +38,13 @@ function updateStatusBar(state, extensionConnections) {
   extensionCountEl.textContent = String(extensionConnections);
 
   const schedule = allSchedules.find(s => s.id === state.activeScheduleId);
-  activeScheduleNameEl.textContent = schedule
-    ? `${schedule.name}${state.scheduleEnabled ? "" : " (paused)"}`
-    : "none";
+  if (schedule) {
+    const bookmark = allBookmarks.find(b => b.id === state.currentBookmarkId);
+    const bookmarkSuffix = bookmark ? ` · ${bookmark.name}` : "";
+    activeScheduleNameEl.textContent = schedule.name + bookmarkSuffix;
+  } else {
+    activeScheduleNameEl.textContent = "none";
+  }
 
   const action = state.activeTabAction;
   if (action.status === "pending") {
@@ -79,6 +85,8 @@ function connect() {
     } else if (msg.type === "schedules_updated") {
       allSchedules = msg.schedules;
       schedulesSection.setSchedules(allSchedules);
+    } else if (msg.type === "tabs_updated") {
+      tabsSection.setTabs(msg.tabs);
     } else if (msg.type === "log_entry") {
       logsSection.appendEntry(msg.entry);
     }
@@ -102,11 +110,12 @@ function connect() {
 
 async function init() {
   try {
-    const [stateData, fetchedBookmarks, fetchedSchedules, logsData] = await Promise.all([
+    const [stateData, fetchedBookmarks, fetchedSchedules, logsData, fetchedTabs] = await Promise.all([
       api.getState(),
       api.listBookmarks(),
       api.listSchedules(),
-      api.getLogs()
+      api.getLogs(),
+      api.getTabs()
     ]);
 
     allBookmarks = fetchedBookmarks;
@@ -117,6 +126,7 @@ async function init() {
     await bookmarksSection.init(allBookmarks);
     await schedulesSection.init(allBookmarks);
     schedulesSection.setActiveScheduleId(stateData.state.activeScheduleId);
+    tabsSection.init(fetchedTabs);
     logsSection.init(logsData);
 
     connect();

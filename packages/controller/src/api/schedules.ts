@@ -4,6 +4,7 @@ import type { ControllerState } from "@schedurler/shared";
 import type { ControllerStateStore } from "../storage/controllerStateStore";
 import type { SchedulesStore } from "../storage/schedulesStore";
 import type { BrowserSocketServer } from "../ws/browserSocketServer";
+import type { ScheduleRunner } from "../scheduler";
 
 type Deps = {
   schedulesStore: SchedulesStore;
@@ -11,6 +12,7 @@ type Deps = {
   stateRef: { current: ControllerState };
   browserSocketServer: BrowserSocketServer;
   getExtensionConnectionCount: () => number;
+  scheduleRunner?: ScheduleRunner | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -133,13 +135,25 @@ export async function handleActivateSchedule(
     return;
   }
 
-  deps.stateRef.current = { ...deps.stateRef.current, activeScheduleId: id, scheduleEnabled: true };
+  deps.stateRef.current = {
+    ...deps.stateRef.current,
+    activeScheduleId: id,
+    scheduleEnabled: true,
+    scheduleTabId: null
+  };
   await deps.controllerStateStore.save(deps.stateRef.current);
   deps.browserSocketServer.broadcast({
     type: "state_update",
     state: deps.stateRef.current,
     extensionConnections: deps.getExtensionConnectionCount()
   });
+
+  // Immediately open the most-recently-due bookmark in a new tab
+  const active = schedules.find((s) => s.id === id);
+  if (active) {
+    await deps.scheduleRunner?.activateNow(active);
+  }
+
   sendJson(response, 200, { ok: true });
 }
 
@@ -156,7 +170,15 @@ export async function handleDeactivateSchedule(
     return;
   }
 
-  deps.stateRef.current = { ...deps.stateRef.current, activeScheduleId: null, scheduleEnabled: false };
+  // Close the dedicated schedule tab before clearing state
+  deps.scheduleRunner?.deactivateNow();
+
+  deps.stateRef.current = {
+    ...deps.stateRef.current,
+    activeScheduleId: null,
+    scheduleEnabled: false,
+    scheduleTabId: null
+  };
   await deps.controllerStateStore.save(deps.stateRef.current);
   deps.browserSocketServer.broadcast({
     type: "state_update",

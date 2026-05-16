@@ -35,6 +35,9 @@ import { serveStatic } from "./api/serveStatic";
 import type { BookmarksStore } from "./storage/bookmarksStore";
 import type { ControllerStateStore } from "./storage/controllerStateStore";
 import type { SchedulesStore } from "./storage/schedulesStore";
+import type { ScheduleRunner } from "./scheduler";
+import type { TabEntry } from "./index";
+import { handleGetTabs, handleCloseTab } from "./api/tabs";
 import { ControllerSocketServer } from "./ws/socketServer";
 import { BrowserSocketServer } from "./ws/browserSocketServer";
 
@@ -48,6 +51,8 @@ export type ControllerServerOptions = {
   bookmarksStore: BookmarksStore;
   schedulesStore: SchedulesStore;
   controllerStateStore: ControllerStateStore;
+  scheduleRunnerRef: { current: ScheduleRunner | null };
+  tabRegistry: Map<number, TabEntry>;
   onExtensionMessage: (message: ExtensionToControllerMessage) => Promise<void>;
   onExtensionClose: () => void;
   getLogs: () => readonly LogEntry[];
@@ -271,7 +276,8 @@ async function handleRequest(
         controllerStateStore: options.controllerStateStore,
         stateRef: options.stateRef,
         browserSocketServer,
-        getExtensionConnectionCount: () => socketServer.getConnectionCount()
+        getExtensionConnectionCount: () => socketServer.getConnectionCount(),
+        scheduleRunner: options.scheduleRunnerRef.current
       });
       return;
     }
@@ -285,7 +291,8 @@ async function handleRequest(
         controllerStateStore: options.controllerStateStore,
         stateRef: options.stateRef,
         browserSocketServer,
-        getExtensionConnectionCount: () => socketServer.getConnectionCount()
+        getExtensionConnectionCount: () => socketServer.getConnectionCount(),
+        scheduleRunner: options.scheduleRunnerRef.current
       });
       return;
     }
@@ -407,6 +414,26 @@ async function handleRequest(
 
     sendJson(response, 202, { ok: true, commandId: command.commandId });
     return;
+  }
+
+  // --- Tab management ---
+
+  if (method === "GET" && pathname === "/api/tabs") {
+    handleGetTabs(response, { tabRegistry: options.tabRegistry, socketServer });
+    return;
+  }
+
+  {
+    const params = matchPath("/api/tabs/:tabId", pathname);
+    if (params && method === "DELETE") {
+      const tabId = parseInt(params.tabId, 10);
+      if (isNaN(tabId)) {
+        sendJson(response, 400, { error: "tabId must be a number" });
+        return;
+      }
+      await handleCloseTab(response, tabId, { socketServer });
+      return;
+    }
   }
 
   sendJson(response, 404, { error: "Not found" });

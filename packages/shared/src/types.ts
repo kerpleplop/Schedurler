@@ -36,6 +36,7 @@ export type ControllerState = {
   scheduleEnabled: boolean;
   currentBookmarkId: string | null;
   activeTabAction: ActiveTabAction;
+  scheduleTabId: number | null;
 };
 
 export type ControllerSettings = {

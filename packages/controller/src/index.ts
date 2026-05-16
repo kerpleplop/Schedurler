@@ -14,6 +14,15 @@ import { resolveStoragePaths } from "./storage/paths";
 import type { ControllerSocketServer } from "./ws/socketServer";
 import type { BrowserSocketServer } from "./ws/browserSocketServer";
 
+export type TabEntry = {
+  tabId: number;
+  url: string;
+  title?: string;
+  favIconUrl?: string;
+  label?: string;    // e.g. "Scheduled: Test" | "Bookmark: dragon" | undefined
+  openedAt: string;  // ISO timestamp — set when first seen
+};
+
 async function main(): Promise<void> {
   const { settings, wsPath } = loadControllerConfig();
   const storagePaths = resolveStoragePaths(settings);
@@ -32,10 +41,22 @@ async function main(): Promise<void> {
     current: await controllerStateStore.loadOrCreate(createDefaultState())
   };
 
+  // Volatile in-memory tab registry — repopulated by the extension on connect.
+  // Not persisted; stale scheduleTabId from disk is cleared on first extension message.
+  const tabRegistry = new Map<number, TabEntry>();
+
+  // The controller's own web UI port — tabs on this port (any loopback host) are hidden from Open Tabs.
+  const controllerPort = settings.port;
+
   const logBuffer = new LogBuffer();
 
-  // Declared before startControllerServer so closures below can reference it.
-  // Assigned immediately after, before any callback can fire.
+  // scheduleRunnerRef is populated after the server starts.
+  // Closures below can reference it safely because HTTP callbacks
+  // only fire after the event loop returns from main().
+  const scheduleRunnerRef: { current: ScheduleRunner | null } = { current: null };
+
+  // log is declared before startControllerServer so closures can reference it,
+  // then assigned after to get access to browserSocketServer.
   let log: (level: "info" | "warn" | "error", message: string) => void = () => {};
 
   const { socketServer, browserSocketServer } = await startControllerServer({
@@ -45,16 +66,21 @@ async function main(): Promise<void> {
     bookmarksStore,
     schedulesStore,
     controllerStateStore,
+    scheduleRunnerRef,
+    tabRegistry,
     getLogs: () => logBuffer.getAll(),
     onExtensionMessage: async (message) => {
-      await handleExtensionMessage(
-        message,
+      await handleExtensionMessage(message, {
         stateRef,
+        tabRegistry,
+        controllerPort,
         controllerStateStore,
         socketServer,
         browserSocketServer,
-        log
-      );
+        bookmarksStore,
+        schedulesStore,
+        log: (...args) => log(...args)
+      });
     },
     onExtensionClose: () => {
       log("info", "Extension disconnected");
@@ -71,7 +97,7 @@ async function main(): Promise<void> {
     browserSocketServer.broadcast({ type: "log_entry", entry });
   };
 
-  new ScheduleRunner({
+  scheduleRunnerRef.current = new ScheduleRunner({
     stateRef,
     schedulesStore,
     bookmarksStore,
@@ -93,6 +119,7 @@ function createDefaultState(): ControllerState {
     activeScheduleId: null,
     scheduleEnabled: false,
     currentBookmarkId: null,
+    scheduleTabId: null,
     activeTabAction: {
       bookmarkId: null,
       url: null,
@@ -103,43 +130,155 @@ function createDefaultState(): ControllerState {
   };
 }
 
+type MessageContext = {
+  stateRef: { current: ControllerState };
+  tabRegistry: Map<number, TabEntry>;
+  controllerPort: number;
+  controllerStateStore: ControllerStateStore;
+  socketServer: ControllerSocketServer;
+  browserSocketServer: BrowserSocketServer;
+  bookmarksStore: BookmarksStore;
+  schedulesStore: SchedulesStore;
+  log: (level: "info" | "warn" | "error", message: string) => void;
+};
+
+/** Returns true for tabs served by the controller's own web UI — hide them from Open Tabs.
+ *  Checks both 127.0.0.1 and localhost since browsers may use either. */
+function isWebUiUrl(url: string, port: number): boolean {
+  try {
+    const { hostname, port: urlPort } = new URL(url);
+    return (hostname === "127.0.0.1" || hostname === "localhost") &&
+           urlPort === String(port);
+  } catch {
+    return false;
+  }
+}
+
 async function handleExtensionMessage(
   message: ExtensionToControllerMessage,
-  stateRef: { current: ControllerState },
-  controllerStateStore: ControllerStateStore,
-  socketServer: ControllerSocketServer,
-  browserSocketServer: BrowserSocketServer,
-  log: (level: "info" | "warn" | "error", message: string) => void
+  ctx: MessageContext
 ): Promise<void> {
+  const { stateRef, tabRegistry, controllerStateStore, socketServer, browserSocketServer, log } = ctx;
+
   switch (message.type) {
-    case "hello":
+    case "hello": {
       log("info", `Extension connected: ${message.browser} v${message.version ?? "unknown"}`);
+      // Clear stale scheduleTabId — the tab may no longer exist after a restart
+      if (stateRef.current.scheduleTabId !== null) {
+        stateRef.current = { ...stateRef.current, scheduleTabId: null };
+        await controllerStateStore.save(stateRef.current);
+      }
       browserSocketServer.broadcast({
         type: "state_update",
         state: stateRef.current,
         extensionConnections: socketServer.getConnectionCount()
       });
       return;
-    case "tab_opened":
+    }
+
+    case "tab_opened": {
+      const isScheduleSource = stateRef.current.activeTabAction.source === "schedule";
+
       stateRef.current = {
         ...stateRef.current,
         currentBookmarkId: message.bookmarkId ?? stateRef.current.currentBookmarkId,
+        // If from a schedule, record this as the dedicated schedule tab
+        scheduleTabId: isScheduleSource ? message.tabId : stateRef.current.scheduleTabId,
         activeTabAction: {
           bookmarkId: message.bookmarkId ?? null,
           url: message.url,
-          startedAt:
-            stateRef.current.activeTabAction.startedAt ?? message.observedAt,
+          startedAt: stateRef.current.activeTabAction.startedAt ?? message.observedAt,
           source: stateRef.current.activeTabAction.source,
           status: "completed"
         }
       };
+
+      // Update tab registry entry with label (skip web UI tabs)
+      if (!isWebUiUrl(message.url, ctx.controllerPort)) {
+        const existing = tabRegistry.get(message.tabId);
+        if (existing) {
+          existing.url = message.url;
+        } else {
+          const label = await resolveTabLabel(message.tabId, stateRef, ctx);
+          tabRegistry.set(message.tabId, {
+            tabId: message.tabId,
+            url: message.url,
+            openedAt: message.observedAt,
+            label
+          });
+        }
+
+        // Notify UI of the updated tab list
+        browserSocketServer.broadcast({
+          type: "tabs_updated",
+          tabs: tabsArray(tabRegistry)
+        });
+      }
       break;
-    case "command_failed":
+    }
+
+    case "tab_closed": {
+      const wasScheduleTab = stateRef.current.scheduleTabId === message.tabId;
+      tabRegistry.delete(message.tabId);
+
+      if (wasScheduleTab) {
+        log("warn", "Schedule tab was closed by user — will re-open on next event");
+        stateRef.current = { ...stateRef.current, scheduleTabId: null };
+      }
+
+      browserSocketServer.broadcast({
+        type: "tabs_updated",
+        tabs: tabsArray(tabRegistry)
+      });
+
+      if (wasScheduleTab) {
+        await controllerStateStore.save(stateRef.current);
+        browserSocketServer.broadcast({
+          type: "state_update",
+          state: stateRef.current,
+          extensionConnections: socketServer.getConnectionCount()
+        });
+      }
+      return;
+    }
+
+    case "tabs_state": {
+      const now = new Date().toISOString();
+      log("info", `Tab snapshot received: ${message.tabs.length} tab(s)`);
+      // Merge incoming snapshot into registry (preserve openedAt for known tabs)
+      const incoming = new Set(message.tabs.map((t) => t.tabId));
+
+      // Remove tabs no longer open
+      for (const id of tabRegistry.keys()) {
+        if (!incoming.has(id)) tabRegistry.delete(id);
+      }
+
+      // Add/update tabs from snapshot (skip web UI tabs)
+      for (const t of message.tabs.filter(t => !isWebUiUrl(t.url, ctx.controllerPort))) {
+        const existing = tabRegistry.get(t.tabId);
+        const label = resolveTabLabelFromId(t.tabId, stateRef, ctx);
+        tabRegistry.set(t.tabId, {
+          tabId: t.tabId,
+          url: t.url,
+          title: t.title,
+          favIconUrl: t.favIconUrl,
+          label,
+          openedAt: existing?.openedAt ?? now
+        });
+      }
+
+      browserSocketServer.broadcast({
+        type: "tabs_updated",
+        tabs: tabsArray(tabRegistry)
+      });
+      return;
+    }
+
+    case "command_failed": {
       stateRef.current = {
         ...stateRef.current,
         activeTabAction: {
-          bookmarkId:
-            message.bookmarkId ?? stateRef.current.activeTabAction.bookmarkId,
+          bookmarkId: message.bookmarkId ?? stateRef.current.activeTabAction.bookmarkId,
           url: stateRef.current.activeTabAction.url,
           startedAt: stateRef.current.activeTabAction.startedAt,
           source: stateRef.current.activeTabAction.source,
@@ -148,7 +287,9 @@ async function handleExtensionMessage(
         }
       };
       break;
-    case "status":
+    }
+
+    case "status": {
       if (message.status === "error") {
         stateRef.current = {
           ...stateRef.current,
@@ -160,6 +301,7 @@ async function handleExtensionMessage(
         };
       }
       break;
+    }
   }
 
   await controllerStateStore.save(stateRef.current);
@@ -169,6 +311,40 @@ async function handleExtensionMessage(
     state: stateRef.current,
     extensionConnections: socketServer.getConnectionCount()
   });
+}
+
+/** Build a label for a tab based on whether it's the schedule tab or a bookmark tab. */
+async function resolveTabLabel(
+  tabId: number,
+  stateRef: { current: ControllerState },
+  ctx: MessageContext
+): Promise<string | undefined> {
+  if (stateRef.current.scheduleTabId === tabId && stateRef.current.activeScheduleId) {
+    const schedules = await ctx.schedulesStore.list();
+    const schedule = schedules.find((s) => s.id === stateRef.current.activeScheduleId);
+    if (schedule) return `Scheduled: ${schedule.name}`;
+  }
+  if (stateRef.current.activeTabAction.source !== "schedule" &&
+      stateRef.current.activeTabAction.bookmarkId) {
+    const bookmarks = await ctx.bookmarksStore.list();
+    const bookmark = bookmarks.find((b) => b.id === stateRef.current.activeTabAction.bookmarkId);
+    if (bookmark) return `Bookmark: ${bookmark.name}`;
+  }
+  return undefined;
+}
+
+/** Synchronous label resolution used in tabs_state (uses current in-memory state only). */
+function resolveTabLabelFromId(
+  tabId: number,
+  stateRef: { current: ControllerState },
+  _ctx: MessageContext
+): string | undefined {
+  // Preserve existing label if we already know it
+  return undefined; // labels are enriched on tab_opened; tabs_state just carries raw data
+}
+
+function tabsArray(registry: Map<number, TabEntry>): TabEntry[] {
+  return Array.from(registry.values());
 }
 
 main().catch((error) => {

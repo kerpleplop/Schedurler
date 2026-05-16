@@ -3,12 +3,14 @@ import type { Duplex } from "node:stream";
 import type { ControllerState } from "@schedurler/shared";
 import { WebSocket, WebSocketServer } from "ws";
 import type { LogEntry } from "../logBuffer";
+import type { TabEntry } from "../index";
 
 export type BrowserEvent =
   | { type: "state_update"; state: ControllerState; extensionConnections: number }
   | { type: "bookmarks_updated"; bookmarks: unknown[] }
   | { type: "schedules_updated"; schedules: unknown[] }
-  | { type: "log_entry"; entry: LogEntry };
+  | { type: "log_entry"; entry: LogEntry }
+  | { type: "tabs_updated"; tabs: TabEntry[] };
 
 export class BrowserSocketServer {
   private readonly wss: WebSocketServer;

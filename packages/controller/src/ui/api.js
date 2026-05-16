@@ -39,5 +39,9 @@ export const getLogs = () => request("GET", "/api/logs").then(d => d.logs);
 export const getState = () => request("GET", "/api/state");
 export const setScheduleEnabled = (enabled) => request("POST", "/api/state/schedule-enabled", { enabled });
 
+// Tabs
+export const getTabs = () => request("GET", "/api/tabs").then(d => d.tabs);
+export const closeTab = (tabId) => request("DELETE", `/api/tabs/${tabId}`);
+
 // Commands
 export const openUrl = (url, bookmarkId) => request("POST", "/api/commands/open-url", { url, bookmarkId, source: "manual" });

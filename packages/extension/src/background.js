@@ -47,6 +47,11 @@ function handleOpen() {
   });
 
   sendStatus("ready", "Connected to controller");
+
+  // Send a full tab snapshot so the controller can populate its registry
+  reportAllTabs().catch((error) => {
+    console.error("[schedurler-extension] failed to report tabs on connect", error);
+  });
 }
 
 function handleClose() {
@@ -84,6 +89,9 @@ async function handleMessage(event) {
     case "get_status":
       await reportCurrentStatus();
       return;
+    case "get_tabs":
+      await reportAllTabs();
+      return;
     default:
       sendStatus("error", `Unknown command type: ${String(message.type)}`);
   }
@@ -91,10 +99,15 @@ async function handleMessage(event) {
 
 async function handleOpenUrl(command) {
   try {
-    const tab = await browser.tabs.create({
-      url: command.url,
-      active: true
-    });
+    let tab;
+
+    if (Number.isInteger(command.tabId)) {
+      // Reuse an existing tab by updating its URL
+      tab = await browser.tabs.update(command.tabId, { url: command.url, active: true });
+    } else {
+      // Open a new tab
+      tab = await browser.tabs.create({ url: command.url, active: true });
+    }
 
     if (typeof tab.id !== "number") {
       throw new Error("Firefox did not return a tab id");
@@ -108,7 +121,7 @@ async function handleOpenUrl(command) {
       bookmarkId:
         typeof command.bookmarkId === "string" ? command.bookmarkId : null,
       tabId: tab.id,
-      url: typeof tab.url === "string" ? tab.url : command.url,
+      url: command.url,
       observedAt: new Date().toISOString()
     });
   } catch (error) {
@@ -193,6 +206,26 @@ function getTargetTabId(command) {
   return lastControlledTabId;
 }
 
+async function reportAllTabs() {
+  try {
+    const tabs = await browser.tabs.query({});
+    sendMessage({
+      type: "tabs_state",
+      tabs: tabs
+        .filter(t => typeof t.id === "number")
+        .map(t => ({
+          tabId: t.id,
+          url: typeof t.url === "string" ? t.url : "",
+          title: typeof t.title === "string" ? t.title : undefined,
+          favIconUrl: typeof t.favIconUrl === "string" && t.favIconUrl ? t.favIconUrl : undefined
+        })),
+      observedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("[schedurler-extension] failed to query tabs", error);
+  }
+}
+
 function reportCommandFailure(command, error) {
   sendMessage({
     type: "command_failed",
@@ -235,6 +268,30 @@ function scheduleReconnect() {
     });
   }, RECONNECT_DELAY_MS);
 }
+
+browser.tabs.onRemoved.addListener((tabId) => {
+  sendMessage({
+    type: "tab_closed",
+    tabId,
+    observedAt: new Date().toISOString()
+  });
+});
+
+// Notify controller when a new tab is opened by the user
+browser.tabs.onCreated.addListener(() => {
+  reportAllTabs().catch((error) => {
+    console.error("[schedurler-extension] failed to report tabs on create", error);
+  });
+});
+
+// Notify controller when a tab navigates to a new URL
+browser.tabs.onUpdated.addListener((_tabId, changeInfo) => {
+  if (changeInfo.url) {
+    reportAllTabs().catch((error) => {
+      console.error("[schedurler-extension] failed to report tabs on update", error);
+    });
+  }
+});
 
 browser.runtime.onStartup.addListener(() => {
   connect().catch((error) => {

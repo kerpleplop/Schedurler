@@ -14,13 +14,16 @@ export const CONTROLLER_COMMAND_TYPES = [
   "close_tab",
   "mute_tab",
   "unmute_tab",
-  "get_status"
+  "get_status",
+  "get_tabs"
 ] as const;
 
 export const EXTENSION_MESSAGE_TYPES = [
   "hello",
   "status",
   "tab_opened",
-  "command_failed"
+  "command_failed",
+  "tab_closed",
+  "tabs_state"
 ] as const;
 

@@ -18,7 +18,7 @@ body {
   font-size: 13px;
 }
 #app-name { font-weight: 700; font-size: 15px; margin-right: auto; }
-#status-tab-action { color: #aaa; }
+#status-tab-action { color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 35ch; }
 
 /* Nav */
 #main-nav {
@@ -165,6 +165,94 @@ button.btn-danger:hover { background: #fff0f0; }
 .log-warn .log-msg  { color: #b66000; }
 .log-error .log-level { color: #c00; }
 .log-error .log-msg  { color: #c00; }
+
+/* Open Tabs card grid */
+.tab-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.tab-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.tab-top-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.15rem;
+}
+
+.tab-favicon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 3px;
+}
+
+.tab-favicon-fallback {
+  /* Show a globe icon via CSS when no favicon */
+  content: "";
+  background: #ddd;
+  border-radius: 3px;
+}
+
+.tab-label {
+  font-size: 10px;
+  font-weight: 600;
+  background: #e8f0fe;
+  color: #1a5adb;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+.tab-close {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: #999;
+  font-size: 13px;
+  padding: 0 0.2rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.tab-close:hover { color: #c00; background: none; }
+
+.tab-title {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-url {
+  font-size: 11px;
+  color: #777;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-time {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 0.15rem;
+}
 
 /* Misc */
 .empty { color: #888; font-size: 13px; margin: 0.5rem 0; }

@@ -13,7 +13,11 @@ export class ControllerStateStore {
       throw new Error(`Invalid controller state data in ${this.filePath}`);
     }
 
-    return data;
+    // Migrate older persisted state that predates scheduleTabId
+    return {
+      ...data,
+      scheduleTabId: data.scheduleTabId ?? null
+    };
   }
 
   async save(state: ControllerState): Promise<void> {

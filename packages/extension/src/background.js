@@ -1,10 +1,16 @@
 const DEFAULT_CONTROLLER_WS_URL = "ws://127.0.0.1:4312/ws";
 const RECONNECT_DELAY_MS = 2000;
+const RESERVED_TAB_RECREATE_DELAY_MS = 300;
 
 let socket = null;
 let isConnecting = false;
 let reconnectTimer = null;
 let lastControlledTabId = null;
+
+// Keepalive tab — prevents Firefox from closing when all user-visible tabs are closed.
+// Never reported to the controller; never shown in the Open Tabs UI.
+let reservedTabId = null;
+let reservedTabRecreateTimer = null;
 
 async function connect() {
   if (isConnecting) {
@@ -51,6 +57,13 @@ function handleOpen() {
   // Send a full tab snapshot so the controller can populate its registry
   reportAllTabs().catch((error) => {
     console.error("[schedurler-extension] failed to report tabs on connect", error);
+  });
+
+  // Ensure the keepalive tab exists whenever the controller connects.
+  // Handles the case where Firefox was already running but the reserved tab
+  // was somehow lost between disconnections.
+  ensureReservedTab().catch((error) => {
+    console.error("[schedurler-extension] failed to ensure reserved tab on connect", error);
   });
 }
 
@@ -137,6 +150,12 @@ async function handleCloseTab(command) {
     return;
   }
 
+  // Never close the reserved keepalive tab via a controller command
+  if (targetTabId === reservedTabId) {
+    sendStatus("error", "Cannot close the reserved keepalive tab");
+    return;
+  }
+
   try {
     await browser.tabs.remove(targetTabId);
 
@@ -212,7 +231,7 @@ async function reportAllTabs() {
     sendMessage({
       type: "tabs_state",
       tabs: tabs
-        .filter(t => typeof t.id === "number")
+        .filter(t => typeof t.id === "number" && t.id !== reservedTabId)
         .map(t => ({
           tabId: t.id,
           url: typeof t.url === "string" ? t.url : "",
@@ -223,6 +242,29 @@ async function reportAllTabs() {
     });
   } catch (error) {
     console.error("[schedurler-extension] failed to query tabs", error);
+  }
+}
+
+// Creates the reserved keepalive tab if it doesn't already exist.
+// If a reserved tab ID is known, verifies it's still alive first.
+async function ensureReservedTab() {
+  if (reservedTabId !== null) {
+    try {
+      await browser.tabs.get(reservedTabId);
+      return; // Still alive, nothing to do
+    } catch {
+      // Tab no longer exists
+      reservedTabId = null;
+    }
+  }
+
+  try {
+    const tab = await browser.tabs.create({ url: "about:blank", active: false });
+    if (typeof tab.id === "number") {
+      reservedTabId = tab.id;
+    }
+  } catch (error) {
+    console.error("[schedurler-extension] failed to create reserved tab", error);
   }
 }
 
@@ -270,6 +312,27 @@ function scheduleReconnect() {
 }
 
 browser.tabs.onRemoved.addListener((tabId) => {
+  if (tabId === reservedTabId) {
+    reservedTabId = null;
+
+    // Only recreate if the WebSocket is still open — if the user is intentionally
+    // closing Firefox the socket will be gone too, and we don't want to fight them.
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      if (reservedTabRecreateTimer !== null) {
+        clearTimeout(reservedTabRecreateTimer);
+      }
+      reservedTabRecreateTimer = setTimeout(() => {
+        reservedTabRecreateTimer = null;
+        ensureReservedTab().catch((error) => {
+          console.error("[schedurler-extension] failed to recreate reserved tab", error);
+        });
+      }, RESERVED_TAB_RECREATE_DELAY_MS);
+    }
+
+    // Don't report reserved tab closure to the controller
+    return;
+  }
+
   sendMessage({
     type: "tab_closed",
     tabId,
@@ -307,4 +370,9 @@ browser.runtime.onInstalled.addListener(() => {
 
 connect().catch((error) => {
   console.error("[schedurler-extension] initial connect failed", error);
+});
+
+// Create the keepalive tab on extension startup
+ensureReservedTab().catch((error) => {
+  console.error("[schedurler-extension] failed to create reserved tab on startup", error);
 });

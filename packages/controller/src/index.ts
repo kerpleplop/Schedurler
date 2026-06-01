@@ -45,9 +45,6 @@ async function main(): Promise<void> {
   // Not persisted; stale scheduleTabId from disk is cleared on first extension message.
   const tabRegistry = new Map<number, TabEntry>();
 
-  // The controller's own web UI port — tabs on this port (any loopback host) are hidden from Open Tabs.
-  const controllerPort = settings.port;
-
   const logBuffer = new LogBuffer();
 
   // scheduleRunnerRef is populated after the server starts.
@@ -73,7 +70,6 @@ async function main(): Promise<void> {
       await handleExtensionMessage(message, {
         stateRef,
         tabRegistry,
-        controllerPort,
         controllerStateStore,
         socketServer,
         browserSocketServer,
@@ -133,7 +129,6 @@ function createDefaultState(): ControllerState {
 type MessageContext = {
   stateRef: { current: ControllerState };
   tabRegistry: Map<number, TabEntry>;
-  controllerPort: number;
   controllerStateStore: ControllerStateStore;
   socketServer: ControllerSocketServer;
   browserSocketServer: BrowserSocketServer;
@@ -141,18 +136,6 @@ type MessageContext = {
   schedulesStore: SchedulesStore;
   log: (level: "info" | "warn" | "error", message: string) => void;
 };
-
-/** Returns true for tabs served by the controller's own web UI — hide them from Open Tabs.
- *  Checks both 127.0.0.1 and localhost since browsers may use either. */
-function isWebUiUrl(url: string, port: number): boolean {
-  try {
-    const { hostname, port: urlPort } = new URL(url);
-    return (hostname === "127.0.0.1" || hostname === "localhost") &&
-           urlPort === String(port);
-  } catch {
-    return false;
-  }
-}
 
 async function handleExtensionMessage(
   message: ExtensionToControllerMessage,
@@ -193,27 +176,25 @@ async function handleExtensionMessage(
         }
       };
 
-      // Update tab registry entry with label (skip web UI tabs)
-      if (!isWebUiUrl(message.url, ctx.controllerPort)) {
-        const existing = tabRegistry.get(message.tabId);
-        if (existing) {
-          existing.url = message.url;
-        } else {
-          const label = await resolveTabLabel(message.tabId, stateRef, ctx);
-          tabRegistry.set(message.tabId, {
-            tabId: message.tabId,
-            url: message.url,
-            openedAt: message.observedAt,
-            label
-          });
-        }
-
-        // Notify UI of the updated tab list
-        browserSocketServer.broadcast({
-          type: "tabs_updated",
-          tabs: tabsArray(tabRegistry)
+      // Update tab registry entry with label
+      const existing = tabRegistry.get(message.tabId);
+      if (existing) {
+        existing.url = message.url;
+      } else {
+        const label = await resolveTabLabel(message.tabId, stateRef, ctx);
+        tabRegistry.set(message.tabId, {
+          tabId: message.tabId,
+          url: message.url,
+          openedAt: message.observedAt,
+          label
         });
       }
+
+      // Notify UI of the updated tab list
+      browserSocketServer.broadcast({
+        type: "tabs_updated",
+        tabs: tabsArray(tabRegistry)
+      });
       break;
     }
 
@@ -253,8 +234,8 @@ async function handleExtensionMessage(
         if (!incoming.has(id)) tabRegistry.delete(id);
       }
 
-      // Add/update tabs from snapshot (skip web UI tabs)
-      for (const t of message.tabs.filter(t => !isWebUiUrl(t.url, ctx.controllerPort))) {
+      // Add/update tabs from snapshot
+      for (const t of message.tabs) {
         const existing = tabRegistry.get(t.tabId);
         const label = resolveTabLabelFromId(t.tabId, stateRef, ctx);
         tabRegistry.set(t.tabId, {

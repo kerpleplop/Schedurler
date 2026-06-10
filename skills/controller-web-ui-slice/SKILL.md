@@ -11,7 +11,7 @@ Plan controller-hosted web UI work without pushing ownership into the extension 
 
 - Read `AGENTS.md`.
 - Read `docs/codex-workflows.md`.
-- Inspect `packages/controller/src/server.ts`, `packages/controller/src/index.ts`, `packages/controller/src/config.ts`, and the relevant controller storage files.
+- Inspect `packages/controller/src/server.ts`, `packages/controller/src/index.ts`, `packages/controller/src/config.ts`, `packages/controller/src/ws/socketServer.ts`, and the relevant controller storage files.
 - Read `packages/shared/src/types.ts` and `packages/shared/src/protocol.ts` only to confirm whether a proposed shape is truly shared.
 
 ## Classify The Task
@@ -43,6 +43,7 @@ Treat the deployment target as a trusted local network, not the public internet.
 - origin and CORS posture for the planned browser access pattern
 - documentation language that keeps the feature framed as local-network-only
 - whether a single controller snapshot endpoint would reduce UI chattiness or coupling
+- whether manual actions must fan out across multiple connected extensions rather than stopping at the first socket
 
 Do not add public-internet hardening work unless the user explicitly asks.
 

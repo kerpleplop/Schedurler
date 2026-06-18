@@ -106,6 +106,9 @@ export class ScheduleRunner {
 
     const bookmarks = await bookmarksStore.list();
     await this.fireEvent(schedule, event, bookmarks);
+    // Stamp the current minute so tick() doesn't double-fire if activation
+    // lands in the same wall-clock minute as a scheduled event.
+    this.lastFiredMinute = this.currentMinute();
   }
 
   /**

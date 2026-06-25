@@ -102,8 +102,6 @@ export async function startControllerServer(
   return { httpServer, socketServer, browserSocketServer };
 }
 
-// Matches a URL pattern with named ":param" segments against a pathname.
-// Returns a record of captured values or null if the pattern doesn't match.
 function matchPath(
   pattern: string,
   pathname: string
@@ -360,8 +358,6 @@ async function handleRequest(
     return;
   }
 
-  // --- Existing command endpoint ---
-
   if (method === "POST" && pathname === "/api/commands/open-url") {
     const body = await readJsonBody(request);
     const urlValue = isRecord(body) && typeof body.url === "string" ? body.url : null;
@@ -415,8 +411,6 @@ async function handleRequest(
     sendJson(response, 202, { ok: true, commandId: command.commandId });
     return;
   }
-
-  // --- Tab management ---
 
   if (method === "GET" && pathname === "/api/tabs") {
     handleGetTabs(response, { tabRegistry: options.tabRegistry, socketServer });

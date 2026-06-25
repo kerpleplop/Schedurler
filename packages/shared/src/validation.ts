@@ -120,7 +120,6 @@ export function isControllerState(value: unknown): value is ControllerState {
     return false;
   }
 
-  // scheduleTabId may be absent in older persisted state — treat as null
   const hasValidScheduleTabId =
     value.scheduleTabId === undefined ||
     value.scheduleTabId === null ||

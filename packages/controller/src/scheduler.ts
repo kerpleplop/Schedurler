@@ -64,6 +64,7 @@ export class ScheduleRunner {
     return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
   }
 
+  /** Check the current minute and fire any matching schedule events. */
   private async tick(): Promise<void> {
     const minute = this.currentMinute();
     if (minute === this.lastFiredMinute) return;
@@ -196,6 +197,7 @@ export class ScheduleRunner {
     });
   }
 
+  /** Stop the runner. Call on controller shutdown. */
   stop(): void {
     clearInterval(this.timer);
   }

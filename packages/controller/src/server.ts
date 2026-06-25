@@ -358,6 +358,8 @@ async function handleRequest(
     return;
   }
 
+  // --- Commands ---
+
   if (method === "POST" && pathname === "/api/commands/open-url") {
     const body = await readJsonBody(request);
     const urlValue = isRecord(body) && typeof body.url === "string" ? body.url : null;
@@ -411,6 +413,8 @@ async function handleRequest(
     sendJson(response, 202, { ok: true, commandId: command.commandId });
     return;
   }
+
+  // --- Tabs ---
 
   if (method === "GET" && pathname === "/api/tabs") {
     handleGetTabs(response, { tabRegistry: options.tabRegistry, socketServer });

@@ -32,12 +32,7 @@ function timeToMinutes(time: string): number {
   return h * 60 + m;
 }
 
-/**
- * Find the event that should have most recently fired at or before the given
- * time. If all events are in the future (none have fired yet today), wraps
- * around and returns the latest event in the 24-hour cycle — this represents
- * "yesterday's last event", which would have been the current bookmark.
- */
+/** Find the most-recently-due event, wrapping to yesterday's last if none have fired today. */
 function findLastEvent(events: ScheduleEvent[], currentMinutes: number): ScheduleEvent | null {
   const enabled = events.filter((e) => e.enabled);
   if (enabled.length === 0) return null;
@@ -106,8 +101,6 @@ export class ScheduleRunner {
 
     const bookmarks = await bookmarksStore.list();
     await this.fireEvent(schedule, event, bookmarks);
-    // Stamp the current minute so tick() doesn't double-fire if activation
-    // lands in the same wall-clock minute as a scheduled event.
     this.lastFiredMinute = this.currentMinute();
   }
 

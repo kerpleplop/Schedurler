@@ -3,6 +3,7 @@ export type Bookmark = {
   name: string;
   url: string;
   keywords: string[];
+  tags?: string[];
 };
 
 export type ScheduleEvent = {
@@ -12,10 +13,17 @@ export type ScheduleEvent = {
   enabled: boolean;
 };
 
+export type ScheduleStats = {
+  runCount: number;
+  lastFiredAt: string | null;
+  lastBookmarkId: string | null;
+};
+
 export type Schedule = {
   id: string;
   name: string;
   events: ScheduleEvent[];
+  stats?: ScheduleStats;
 };
 
 export type ActiveTabActionSource = "manual" | "schedule" | "system";
@@ -44,5 +52,12 @@ export type ControllerSettings = {
   localDataDir: string;
   host: string;
   port: number;
+};
+
+export type TabEntry = {
+  tabId: number;
+  url: string;
+  title?: string;
+  favIconUrl?: string;
 };
 

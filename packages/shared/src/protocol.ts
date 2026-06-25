@@ -1,4 +1,4 @@
-import type { ActiveTabActionSource } from "./types";
+import type { ActiveTabActionSource, TabEntry } from "./types";
 import {
   CONTROLLER_COMMAND_TYPES,
   EXTENSION_MESSAGE_TYPES
@@ -95,12 +95,7 @@ export type TabClosedEvent = {
 
 export type TabsStateEvent = {
   type: "tabs_state";
-  tabs: Array<{
-    tabId: number;
-    url: string;
-    title?: string;
-    favIconUrl?: string;
-  }>;
+  tabs: TabEntry[];
   observedAt: string;
 };
 

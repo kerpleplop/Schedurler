@@ -13,7 +13,8 @@ import type {
   ControllerSettings,
   ControllerState,
   Schedule,
-  ScheduleEvent
+  ScheduleEvent,
+  ScheduleStats
 } from "./types";
 
 type UnknownRecord = Record<string, unknown>;
@@ -39,7 +40,8 @@ export function isBookmark(value: unknown): value is Bookmark {
     typeof value.id === "string" &&
     typeof value.name === "string" &&
     typeof value.url === "string" &&
-    isStringArray(value.keywords)
+    isStringArray(value.keywords) &&
+    (value.tags === undefined || isStringArray(value.tags))
   );
 }
 
@@ -56,6 +58,18 @@ export function isScheduleEvent(value: unknown): value is ScheduleEvent {
   );
 }
 
+export function isScheduleStats(value: unknown): value is ScheduleStats {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.runCount === "number" &&
+    (value.lastFiredAt === null || typeof value.lastFiredAt === "string") &&
+    (value.lastBookmarkId === null || typeof value.lastBookmarkId === "string")
+  );
+}
+
 export function isSchedule(value: unknown): value is Schedule {
   if (!isRecord(value) || !Array.isArray(value.events)) {
     return false;
@@ -64,7 +78,8 @@ export function isSchedule(value: unknown): value is Schedule {
   return (
     typeof value.id === "string" &&
     typeof value.name === "string" &&
-    value.events.every(isScheduleEvent)
+    value.events.every(isScheduleEvent) &&
+    (value.stats === undefined || isScheduleStats(value.stats))
   );
 }
 

@@ -20,9 +20,14 @@ npm run dev:controller
 
 # Run controller from compiled output
 npm run start:controller
+
+# Run controller bound to all interfaces (for LAN/Raspberry Pi use)
+npm run start:pi
 ```
 
 Type-check is implicit in all `tsc -b` builds — strict mode is enabled. There is no separate lint or test command.
+
+The `build` and `build:controller` scripts also copy `packages/controller/src/ui/` verbatim into `packages/controller/dist/ui/` — the web UI is plain HTML/CSS/JS and is not transpiled or bundled.
 
 To load the Firefox extension during development: open `about:debugging` → This Firefox → Load Temporary Add-on → pick `packages/extension/manifest.json`.
 
@@ -39,11 +44,57 @@ Schedurler is a local-first monorepo: a Node controller, a Firefox extension, an
 
 ### Package roles
 
-- **`packages/controller`** — source of truth for bookmarks, schedules, and device-local active state. Owns storage, HTTP API, WebSocket server, and future web UI hosting.
+- **`packages/controller`** — source of truth for bookmarks, schedules, and device-local active state. Owns storage, HTTP API, WebSocket server, and web UI hosting.
 - **`packages/extension`** — thin Firefox tab agent. Executes controller-issued commands, reports results. Stateless: no bookmark or schedule ownership.
 - **`packages/shared`** — shared types, protocol definitions, constants, and validation helpers only. No filesystem logic, no browser APIs, no server implementation.
 
 The extension must stay thin and browser-specific. If logic can live in the controller instead of the extension, prefer the controller.
+
+### Two WebSocket servers
+
+The controller runs **two separate WebSocket servers** on the same HTTP port, distinguished by path:
+
+| Path | Class | Purpose |
+|---|---|---|
+| `/ws` | `ControllerSocketServer` | Extension ↔ controller (bidirectional, ping/pong heartbeat) |
+| `/ws/ui` | `BrowserSocketServer` | Controller → browser UI (broadcast-only push) |
+
+`ControllerSocketServer` receives `ExtensionToControllerMessage` frames and sends `ControllerToExtensionMessage` commands. `BrowserSocketServer` only broadcasts `BrowserEvent` objects (`state_update`, `bookmarks_updated`, `schedules_updated`, `tabs_updated`, `log_entry`) — it never receives messages from the UI.
+
+The extension reads `controllerWsUrl` from `browser.storage.local` to override the default `ws://127.0.0.1:4312/ws`. This is how users configure the extension to connect to a controller on the LAN.
+
+### HTTP API surface
+
+All routes are in `packages/controller/src/server.ts`. There is no router library — routes are matched with a hand-rolled `matchPath` helper.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/` | Serves UI `index.html` |
+| `GET` | `/ui/*` | Serves static UI files |
+| `GET` | `/health` | Liveness check + connection counts |
+| `GET` | `/api/logs` | In-memory log buffer |
+| `GET/POST` | `/api/bookmarks` | List / create bookmarks |
+| `PATCH/DELETE` | `/api/bookmarks/:id` | Update / delete bookmark |
+| `GET/POST` | `/api/schedules` | List / create schedules |
+| `PATCH/DELETE` | `/api/schedules/:id` | Update / delete schedule |
+| `POST` | `/api/schedules/:id/duplicate` | Clone a schedule |
+| `POST` | `/api/schedules/:id/activate` | Activate + immediately fire most-recent event |
+| `POST` | `/api/schedules/:id/deactivate` | Deactivate + close schedule tab |
+| `POST` | `/api/schedules/:id/events` | Add an event to a schedule |
+| `PATCH/DELETE` | `/api/schedules/:scheduleId/events/:eventId` | Update / remove an event |
+| `GET` | `/api/state` | Current `ControllerState` |
+| `POST` | `/api/state/schedule-enabled` | Toggle schedule running |
+| `POST` | `/api/commands/open-url` | Manual one-off open URL command |
+| `GET` | `/api/tabs` | Live tab registry |
+| `DELETE` | `/api/tabs/:tabId` | Close a specific tab |
+
+### Schedule runner
+
+`ScheduleRunner` (`packages/controller/src/scheduler.ts`) ticks every second and deduplicates by wall-clock minute (`lastFiredMinute`). On activation it calls `activateNow()`, which finds the most-recently-due enabled event and fires it immediately so the correct bookmark opens right away. When a schedule tab already exists (`scheduleTabId`), the runner reuses it by passing `tabId` in the `open_url` command instead of opening a new tab.
+
+### Extension keepalive tab
+
+The extension maintains a hidden `about:blank` tab (`reservedTabId`) to keep Firefox alive when no other tabs are open. This tab is silently excluded from all `tabs_state` reports and never shown in the UI. It is recreated automatically if closed while the WebSocket is still connected.
 
 ### Storage model
 
@@ -74,7 +125,7 @@ New protocols, constants, and validation rules go to `packages/shared` first, th
 
 **Web UI work**
 
-Keep UI assets, HTTP routes, request parsing, response shaping, and browser-facing view models in `packages/controller`. Do not reuse controller-extension WebSocket message shapes as browser UI HTTP contracts. The deployment target is a trusted local network only — don't add public-internet hardening unless explicitly requested. When adding a UI-facing endpoint, verify: bind host behavior, LAN URL construction, and CORS posture.
+Keep UI assets, HTTP routes, request parsing, response shaping, and browser-facing view models in `packages/controller`. The UI is plain HTML/CSS/JS in `packages/controller/src/ui/` — do not introduce a build step or framework. Do not reuse controller-extension WebSocket message shapes as browser UI HTTP contracts. The deployment target is a trusted local network only — don't add public-internet hardening unless explicitly requested. When adding a UI-facing endpoint, verify: bind host behavior, LAN URL construction, and CORS posture.
 
 ## Conventions
 

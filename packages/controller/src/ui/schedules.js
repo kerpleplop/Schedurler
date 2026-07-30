@@ -162,10 +162,38 @@ function buildScheduleCard(schedule) {
   header.appendChild(actions);
   card.appendChild(header);
 
+  const stats = buildStatsLine(schedule);
+  if (stats) card.appendChild(stats);
+
   // Events list
   card.appendChild(buildEventsSection(schedule));
 
   return card;
+}
+
+function buildStatsLine(schedule) {
+  if (!schedule.stats) return null;
+
+  const { runCount, lastFiredAt, lastBookmarkId } = schedule.stats;
+  const bookmarkName = bookmarks.find(b => b.id === lastBookmarkId)?.name ?? lastBookmarkId;
+
+  const p = document.createElement("p");
+  p.className = "schedule-stats";
+  p.textContent = `Fired ${runCount} time${runCount === 1 ? "" : "s"} · last: ${relativeTime(lastFiredAt)} → ${bookmarkName}`;
+  return p;
+}
+
+function relativeTime(iso) {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
 }
 
 function showRenameForm(card, schedule) {

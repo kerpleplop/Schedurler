@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { isClockTime, isSchedule, type Schedule, type ScheduleEvent } from "@schedurler/shared";
+import {
+  isClockTime,
+  isSchedule,
+  type Schedule,
+  type ScheduleEvent,
+  type ScheduleStats
+} from "@schedurler/shared";
 import { ensureJsonFile, readJsonFile, writeJsonFile } from "./jsonFile";
 
 export class SchedulesStore {
@@ -149,6 +155,26 @@ export class SchedulesStore {
 
     const updated = { ...schedules[scheduleIndex], events };
     schedules[scheduleIndex] = updated;
+    await writeJsonFile(this.filePath, schedules);
+    return updated;
+  }
+
+  async recordFire(id: string, bookmarkId: string, firedAt: string): Promise<Schedule | null> {
+    const schedules = await this.list();
+    const index = schedules.findIndex((s) => s.id === id);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const stats: ScheduleStats = {
+      runCount: (schedules[index].stats?.runCount ?? 0) + 1,
+      lastFiredAt: firedAt,
+      lastBookmarkId: bookmarkId
+    };
+
+    const updated = { ...schedules[index], stats };
+    schedules[index] = updated;
     await writeJsonFile(this.filePath, schedules);
     return updated;
   }

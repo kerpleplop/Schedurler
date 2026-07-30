@@ -180,6 +180,10 @@ export class ScheduleRunner {
     const schedules = await this.options.schedulesStore.list();
     browserSocketServer.broadcast({ type: "schedules_updated", schedules });
 
+    await this.options.bookmarksStore.recordOpen(bookmark.id, command.sentAt);
+    const updatedBookmarks = await this.options.bookmarksStore.list();
+    browserSocketServer.broadcast({ type: "bookmarks_updated", bookmarks: updatedBookmarks });
+
     stateRef.current = {
       ...stateRef.current,
       currentBookmarkId: bookmark.id,

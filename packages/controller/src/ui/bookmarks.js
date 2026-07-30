@@ -82,6 +82,7 @@ function buildBookmarkRow(bookmark) {
     <strong class="item-name">${esc(bookmark.name)}</strong>
     <a class="item-url" href="${esc(bookmark.url)}" target="_blank" rel="noreferrer">${esc(bookmark.url)}</a>
     ${bookmark.keywords.length > 0 ? `<span class="item-keywords">${bookmark.keywords.map(esc).join(", ")}</span>` : ""}
+    ${bookmark.stats ? `<span class="item-stats">Opened ${bookmark.stats.openCount} time${bookmark.stats.openCount === 1 ? "" : "s"} · last: ${relativeTime(bookmark.stats.lastOpenedAt)}</span>` : ""}
   `;
   li.appendChild(info);
 
@@ -155,6 +156,19 @@ function showEditForm(li, bookmark) {
   });
 
   li.replaceWith(form);
+}
+
+function relativeTime(iso) {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
 }
 
 function esc(str) {

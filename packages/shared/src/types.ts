@@ -1,9 +1,15 @@
+export type BookmarkStats = {
+  openCount: number;
+  lastOpenedAt: string | null;
+};
+
 export type Bookmark = {
   id: string;
   name: string;
   url: string;
   keywords: string[];
   tags?: string[];
+  stats?: BookmarkStats;
 };
 
 export type ScheduleEvent = {

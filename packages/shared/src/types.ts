@@ -6,11 +6,19 @@ export type Bookmark = {
   tags?: string[];
 };
 
+export type ScheduleEventRecurrence =
+  | { type: "daily" }
+  | { type: "weekdays" }
+  | { type: "weekly"; daysOfWeek: number[] }
+  | { type: "once"; date: string };
+
 export type ScheduleEvent = {
   id: string;
   time: string;
   bookmarkId: string;
   enabled: boolean;
+  /** Defaults to { type: "daily" } when omitted, for backward compatibility. */
+  recurrence?: ScheduleEventRecurrence;
 };
 
 export type ScheduleStats = {

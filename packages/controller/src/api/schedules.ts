@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { isClockTime } from "@schedurler/shared";
-import type { ControllerState } from "@schedurler/shared";
+import { isClockTime, isScheduleEventRecurrence } from "@schedurler/shared";
+import type { ControllerState, ScheduleEventRecurrence } from "@schedurler/shared";
 import type { ControllerStateStore } from "../storage/controllerStateStore";
 import type { SchedulesStore } from "../storage/schedulesStore";
 import type { BrowserSocketServer } from "../ws/browserSocketServer";
@@ -201,7 +201,7 @@ export async function handleAddEvent(
     return;
   }
 
-  const { time, bookmarkId, enabled } = body;
+  const { time, bookmarkId, enabled, recurrence } = body;
 
   if (!isClockTime(time)) {
     sendJson(response, 400, { error: "time must be in HH:MM format (24-hour)" });
@@ -218,10 +218,16 @@ export async function handleAddEvent(
     return;
   }
 
+  if (recurrence !== undefined && !isScheduleEventRecurrence(recurrence)) {
+    sendJson(response, 400, { error: "recurrence is invalid" });
+    return;
+  }
+
   const schedule = await deps.schedulesStore.addEvent(scheduleId, {
     time,
     bookmarkId,
-    enabled
+    enabled,
+    ...(recurrence !== undefined ? { recurrence: recurrence as ScheduleEventRecurrence } : {})
   });
 
   if (!schedule) {
@@ -247,7 +253,12 @@ export async function handleUpdateEvent(
     return;
   }
 
-  const patch: { time?: string; bookmarkId?: string; enabled?: boolean } = {};
+  const patch: {
+    time?: string;
+    bookmarkId?: string;
+    enabled?: boolean;
+    recurrence?: ScheduleEventRecurrence;
+  } = {};
 
   if (body.time !== undefined) {
     if (!isClockTime(body.time)) {
@@ -271,6 +282,14 @@ export async function handleUpdateEvent(
       return;
     }
     patch.enabled = body.enabled as boolean;
+  }
+
+  if (body.recurrence !== undefined) {
+    if (!isScheduleEventRecurrence(body.recurrence)) {
+      sendJson(response, 400, { error: "recurrence is invalid" });
+      return;
+    }
+    patch.recurrence = body.recurrence;
   }
 
   const schedule = await deps.schedulesStore.updateEvent(scheduleId, eventId, patch);

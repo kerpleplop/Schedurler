@@ -258,3 +258,4 @@ button.btn-danger:hover { background: #fff0f0; }
 .empty { color: #888; font-size: 13px; margin: 0.5rem 0; }
 .empty.small { font-size: 12px; }
 .error-msg { color: #c00; font-size: 13px; margin-bottom: 0.5rem; }
+/* publish-on-push probe: commit 1 of 3 (safe to remove) */

@@ -98,7 +98,7 @@ export class ScheduleRunner {
     if (minute === this.lastFiredMinute) return;
     this.lastFiredMinute = minute;
 
-    const { stateRef, schedulesStore, bookmarksStore, browserSocketServer } = this.options;
+    const { stateRef, schedulesStore, bookmarksStore } = this.options;
 
     if (!stateRef.current.scheduleEnabled || !stateRef.current.activeScheduleId) return;
 
@@ -114,20 +114,8 @@ export class ScheduleRunner {
 
     const bookmarks = await bookmarksStore.list();
 
-    let oneOffFired = false;
     for (const event of matchingEvents) {
       await this.fireEvent(active, event, bookmarks);
-      if (event.recurrence?.type === "once") {
-        await schedulesStore.updateEvent(active.id, event.id, { enabled: false });
-        oneOffFired = true;
-      }
-    }
-
-    if (oneOffFired) {
-      browserSocketServer.broadcast({
-        type: "schedules_updated",
-        schedules: await schedulesStore.list()
-      });
     }
   }
 
@@ -170,17 +158,18 @@ export class ScheduleRunner {
     }
   }
 
-  /** Send an open/update command for one schedule event and update state. */
+  /** Send an open/update command for one schedule event and update state. Returns whether the command was actually sent. */
   private async fireEvent(
     schedule: Schedule,
     event: ScheduleEvent,
     bookmarks: Bookmark[]
-  ): Promise<void> {
+  ): Promise<boolean> {
     const {
       stateRef,
       socketServer,
       controllerStateStore,
       browserSocketServer,
+      schedulesStore,
       onLog
     } = this.options;
 
@@ -191,7 +180,7 @@ export class ScheduleRunner {
         "error",
         `Schedule "${schedule.name}": event at ${event.time} references missing bookmark ${event.bookmarkId}`
       );
-      return;
+      return false;
     }
 
     const existingTabId = stateRef.current.scheduleTabId ?? undefined;
@@ -213,7 +202,7 @@ export class ScheduleRunner {
         "warn",
         `Schedule "${schedule.name}": ${event.time} — no extension connected, skipped "${bookmark.name}"`
       );
-      return;
+      return false;
     }
 
     const action = existingTabId !== undefined ? "updated tab to" : "opened";
@@ -238,6 +227,18 @@ export class ScheduleRunner {
       state: stateRef.current,
       extensionConnections: socketServer.getConnectionCount()
     });
+
+    // Only retire a one-time event once it has actually fired, so a missing
+    // bookmark or a disconnected extension leaves it enabled to try again.
+    if (event.recurrence?.type === "once") {
+      await schedulesStore.updateEvent(schedule.id, event.id, { enabled: false });
+      browserSocketServer.broadcast({
+        type: "schedules_updated",
+        schedules: await schedulesStore.list()
+      });
+    }
+
+    return true;
   }
 
   /** Stop the runner. Call on controller shutdown. */

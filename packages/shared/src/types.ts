@@ -1,8 +1,9 @@
+// test comment 1: reviewable MCP smoke test
 export type Bookmark = {
   id: string;
   name: string;
   url: string;
-  keywords: string[];
+  keywords: string[]; // test comment 2: reviewable MCP smoke test
   tags?: string[];
 };
 
@@ -10,7 +11,7 @@ export type ScheduleEventRecurrence =
   | { type: "daily" }
   | { type: "weekdays" }
   | { type: "weekly"; daysOfWeek: number[] }
-  | { type: "once"; date: string };
+  | { type: "once"; date: string }; // test comment 3: reviewable MCP smoke test
 
 export type ScheduleEvent = {
   id: string;

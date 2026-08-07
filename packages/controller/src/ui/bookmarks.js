@@ -1,4 +1,5 @@
 import * as api from "./api.js";
+import { relativeTime } from "./time.js";
 
 const section = document.getElementById("section-bookmarks");
 
@@ -165,19 +166,6 @@ function shortUrl(url) {
   } catch {
     return url;
   }
-}
-
-function relativeTime(iso) {
-  if (!iso) return "";
-  const diff = Date.now() - new Date(iso).getTime();
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  return `${d}d ago`;
 }
 
 function esc(str) {

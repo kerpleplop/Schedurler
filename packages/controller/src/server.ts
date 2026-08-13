@@ -390,6 +390,12 @@ async function handleRequest(
       return;
     }
 
+    if (bookmarkId) {
+      await options.bookmarksStore.recordOpen(bookmarkId, command.sentAt);
+      const bookmarks = await options.bookmarksStore.list();
+      browserSocketServer.broadcast({ type: "bookmarks_updated", bookmarks });
+    }
+
     options.stateRef.current = {
       ...options.stateRef.current,
       currentBookmarkId: bookmarkId,

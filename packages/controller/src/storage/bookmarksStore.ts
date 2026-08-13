@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { isBookmark, type Bookmark } from "@schedurler/shared";
+import { isBookmark, type Bookmark, type BookmarkStats } from "@schedurler/shared";
 import { ensureJsonFile, readJsonFile, writeJsonFile } from "./jsonFile";
 
 export class BookmarksStore {
@@ -42,6 +42,25 @@ export class BookmarksStore {
     }
 
     const updated = { ...bookmarks[index], ...patch };
+    bookmarks[index] = updated;
+    await writeJsonFile(this.filePath, bookmarks);
+    return updated;
+  }
+
+  async recordOpen(id: string, openedAt: string): Promise<Bookmark | null> {
+    const bookmarks = await this.list();
+    const index = bookmarks.findIndex((b) => b.id === id);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const stats: BookmarkStats = {
+      openCount: (bookmarks[index].stats?.openCount ?? 0) + 1,
+      lastOpenedAt: openedAt
+    };
+
+    const updated = { ...bookmarks[index], stats };
     bookmarks[index] = updated;
     await writeJsonFile(this.filePath, bookmarks);
     return updated;

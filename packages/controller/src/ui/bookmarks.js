@@ -1,4 +1,5 @@
 import * as api from "./api.js";
+import { relativeTime } from "./time.js";
 
 const section = document.getElementById("section-bookmarks");
 
@@ -80,8 +81,9 @@ function buildBookmarkRow(bookmark) {
   info.className = "item-info";
   info.innerHTML = `
     <strong class="item-name">${esc(bookmark.name)}</strong>
-    <a class="item-url" href="${esc(bookmark.url)}" target="_blank" rel="noreferrer">${esc(bookmark.url)}</a>
+    <a class="item-url" href="${esc(bookmark.url)}" title="${esc(bookmark.url)}" target="_blank" rel="noreferrer">${esc(shortUrl(bookmark.url))}</a>
     ${bookmark.keywords.length > 0 ? `<span class="item-keywords">${bookmark.keywords.map(esc).join(", ")}</span>` : ""}
+    ${bookmark.stats ? `<span class="item-stats">Opened ${bookmark.stats.openCount} time${bookmark.stats.openCount === 1 ? "" : "s"} · last: ${relativeTime(bookmark.stats.lastOpenedAt)}</span>` : ""}
   `;
   li.appendChild(info);
 
@@ -155,6 +157,15 @@ function showEditForm(li, bookmark) {
   });
 
   li.replaceWith(form);
+}
+
+function shortUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.hostname}${parsed.pathname}`.replace(/\/$/, "") || parsed.hostname;
+  } catch {
+    return url;
+  }
 }
 
 function esc(str) {

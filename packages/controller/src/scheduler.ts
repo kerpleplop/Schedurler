@@ -176,6 +176,14 @@ export class ScheduleRunner {
     const action = existingTabId !== undefined ? "updated tab to" : "opened";
     onLog("info", `Schedule "${schedule.name}": ${action} "${bookmark.name}" at ${event.time}`);
 
+    await this.options.schedulesStore.recordFire(schedule.id, bookmark.id, command.sentAt);
+    const schedules = await this.options.schedulesStore.list();
+    browserSocketServer.broadcast({ type: "schedules_updated", schedules });
+
+    await this.options.bookmarksStore.recordOpen(bookmark.id, command.sentAt);
+    const updatedBookmarks = await this.options.bookmarksStore.list();
+    browserSocketServer.broadcast({ type: "bookmarks_updated", bookmarks: updatedBookmarks });
+
     stateRef.current = {
       ...stateRef.current,
       currentBookmarkId: bookmark.id,

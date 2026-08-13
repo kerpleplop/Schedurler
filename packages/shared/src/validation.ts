@@ -10,6 +10,7 @@ import type {
 import type {
   ActiveTabAction,
   Bookmark,
+  BookmarkStats,
   ControllerSettings,
   ControllerState,
   Schedule,
@@ -31,6 +32,17 @@ export function isClockTime(value: unknown): value is string {
   return typeof value === "string" && CLOCK_TIME_PATTERN.test(value);
 }
 
+export function isBookmarkStats(value: unknown): value is BookmarkStats {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.openCount === "number" &&
+    (value.lastOpenedAt === null || typeof value.lastOpenedAt === "string")
+  );
+}
+
 export function isBookmark(value: unknown): value is Bookmark {
   if (!isRecord(value)) {
     return false;
@@ -41,7 +53,8 @@ export function isBookmark(value: unknown): value is Bookmark {
     typeof value.name === "string" &&
     typeof value.url === "string" &&
     isStringArray(value.keywords) &&
-    (value.tags === undefined || isStringArray(value.tags))
+    (value.tags === undefined || isStringArray(value.tags)) &&
+    (value.stats === undefined || isBookmarkStats(value.stats))
   );
 }
 

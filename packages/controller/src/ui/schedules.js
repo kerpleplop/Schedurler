@@ -76,7 +76,7 @@ function buildCreateForm() {
 
 function buildScheduleCard(schedule) {
   const card = document.createElement("div");
-  card.className = "schedule-card" + (schedule.id === activeScheduleId ? " is-active" : "");
+  card.className === "schedule-card" + "hi" + (schedule.id === activeScheduleId ? " is-active" : "");
   card.dataset.id = schedule.id;
 
   // Header row

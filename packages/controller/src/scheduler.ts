@@ -5,7 +5,8 @@ import type {
   ControllerState,
   OpenUrlCommand,
   Schedule,
-  ScheduleEvent
+  ScheduleEvent,
+  ScheduleEventRecurrence
 } from "@schedurler/shared";
 import type { BookmarksStore } from "./storage/bookmarksStore";
 import type { ControllerStateStore } from "./storage/controllerStateStore";
@@ -32,9 +33,36 @@ function timeToMinutes(time: string): number {
   return h * 60 + m;
 }
 
+/** Format a Date as a local YYYY-MM-DD string. */
+function formatDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+const DEFAULT_RECURRENCE: ScheduleEventRecurrence = { type: "daily" };
+
+/** Whether an event's recurrence rule includes the given day. Events without a recurrence fire daily. */
+function matchesRecurrence(recurrence: ScheduleEventRecurrence | undefined, now: Date): boolean {
+  const rule = recurrence ?? DEFAULT_RECURRENCE;
+  switch (rule.type) {
+    case "daily":
+      return true;
+    case "weekdays": {
+      const day = now.getDay();
+      return day >= 1 && day <= 5;
+    }
+    case "weekly":
+      return rule.daysOfWeek.includes(now.getDay());
+    case "once":
+      return rule.date === formatDate(now);
+  }
+}
+
 /** Find the most-recently-due event, wrapping to yesterday's last if none have fired today. */
-function findLastEvent(events: ScheduleEvent[], currentMinutes: number): ScheduleEvent | null {
-  const enabled = events.filter((e) => e.enabled);
+function findLastEvent(events: ScheduleEvent[], currentMinutes: number, now: Date): ScheduleEvent | null {
+  const enabled = events.filter((e) => e.enabled && matchesRecurrence(e.recurrence, now));
   if (enabled.length === 0) return null;
 
   const past = enabled.filter((e) => timeToMinutes(e.time) <= currentMinutes);
@@ -78,7 +106,10 @@ export class ScheduleRunner {
     const active = schedules.find((s) => s.id === stateRef.current.activeScheduleId);
     if (!active) return;
 
-    const matchingEvents = active.events.filter((e) => e.enabled && e.time === minute);
+    const now = new Date();
+    const matchingEvents = active.events.filter(
+      (e) => e.enabled && e.time === minute && matchesRecurrence(e.recurrence, now)
+    );
     if (matchingEvents.length === 0) return;
 
     const bookmarks = await bookmarksStore.list();
@@ -97,7 +128,7 @@ export class ScheduleRunner {
 
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const event = findLastEvent(schedule.events, currentMinutes);
+    const event = findLastEvent(schedule.events, currentMinutes, now);
     if (!event) return;
 
     const bookmarks = await bookmarksStore.list();
@@ -127,17 +158,18 @@ export class ScheduleRunner {
     }
   }
 
-  /** Send an open/update command for one schedule event and update state. */
+  /** Send an open/update command for one schedule event and update state. Returns whether the command was actually sent. */
   private async fireEvent(
     schedule: Schedule,
     event: ScheduleEvent,
     bookmarks: Bookmark[]
-  ): Promise<void> {
+  ): Promise<boolean> {
     const {
       stateRef,
       socketServer,
       controllerStateStore,
       browserSocketServer,
+      schedulesStore,
       onLog
     } = this.options;
 
@@ -148,7 +180,7 @@ export class ScheduleRunner {
         "error",
         `Schedule "${schedule.name}": event at ${event.time} references missing bookmark ${event.bookmarkId}`
       );
-      return;
+      return false;
     }
 
     const existingTabId = stateRef.current.scheduleTabId ?? undefined;
@@ -170,7 +202,7 @@ export class ScheduleRunner {
         "warn",
         `Schedule "${schedule.name}": ${event.time} — no extension connected, skipped "${bookmark.name}"`
       );
-      return;
+      return false;
     }
 
     const action = existingTabId !== undefined ? "updated tab to" : "opened";
@@ -195,6 +227,18 @@ export class ScheduleRunner {
       state: stateRef.current,
       extensionConnections: socketServer.getConnectionCount()
     });
+
+    // Only retire a one-time event once it has actually fired, so a missing
+    // bookmark or a disconnected extension leaves it enabled to try again.
+    if (event.recurrence?.type === "once") {
+      await schedulesStore.updateEvent(schedule.id, event.id, { enabled: false });
+      browserSocketServer.broadcast({
+        type: "schedules_updated",
+        schedules: await schedulesStore.list()
+      });
+    }
+
+    return true;
   }
 
   /** Stop the runner. Call on controller shutdown. */

@@ -1,6 +1,7 @@
 import * as api from "./api.js";
 
 const section = document.getElementById("section-schedules");
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 let schedules = [];
 let bookmarks = [];
@@ -231,7 +232,7 @@ function buildEventRow(schedule, event, list) {
 
   const info = document.createElement("span");
   info.className = "event-info";
-  info.innerHTML = `<code>${esc(event.time)}</code> — ${esc(bookmarkName)} ${event.enabled ? "" : '<em>(disabled)</em>'}`;
+  info.innerHTML = `<code>${esc(event.time)}</code> — ${esc(bookmarkName)} <span class="event-recurrence">${esc(formatRecurrence(event.recurrence))}</span> ${event.enabled ? "" : '<em>(disabled)</em>'}`;
   li.appendChild(info);
 
   const actions = document.createElement("span");
@@ -281,20 +282,30 @@ function showEditEventForm(li, schedule, event) {
     <select name="bookmarkId">
       ${bookmarks.map(b => `<option value="${esc(b.id)}" ${b.id === event.bookmarkId ? "selected" : ""}>${esc(b.name)}</option>`).join("")}
     </select>
+    ${recurrenceFieldsHtml(event.recurrence)}
     <label><input name="enabled" type="checkbox" ${event.enabled ? "checked" : ""} /> Enabled</label>
     <button type="submit">Save</button>
     <button type="button" class="btn-cancel">Cancel</button>
   `;
 
+  attachRecurrenceToggle(form);
   form.querySelector(".btn-cancel").addEventListener("click", () => render());
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
+    let recurrence;
+    try {
+      recurrence = readRecurrenceFromForm(form);
+    } catch (err) {
+      showError(section, err.message);
+      return;
+    }
     const patch = {
       time: fd.get("time"),
       bookmarkId: fd.get("bookmarkId"),
-      enabled: form.querySelector('[name="enabled"]').checked
+      enabled: form.querySelector('[name="enabled"]').checked,
+      recurrence
     };
     try {
       const updated = await api.updateEvent(schedule.id, event.id, patch);
@@ -316,6 +327,7 @@ function buildAddEventForm(schedule) {
     <select name="bookmarkId">
       ${bookmarks.map(b => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join("")}
     </select>
+    ${recurrenceFieldsHtml()}
     <button type="submit">Add event</button>
   `;
 
@@ -327,13 +339,23 @@ function buildAddEventForm(schedule) {
     return note;
   }
 
+  attachRecurrenceToggle(form);
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
+    let recurrence;
+    try {
+      recurrence = readRecurrenceFromForm(form);
+    } catch (err) {
+      showError(section, err.message);
+      return;
+    }
     const data = {
       time: fd.get("time"),
       bookmarkId: fd.get("bookmarkId"),
-      enabled: true
+      enabled: true,
+      recurrence
     };
     try {
       const updated = await api.addEvent(schedule.id, data);
@@ -345,6 +367,80 @@ function buildAddEventForm(schedule) {
   });
 
   return form;
+}
+
+function recurrenceFieldsHtml(recurrence) {
+  const r = recurrence ?? { type: "daily" };
+  const selectedDays = r.type === "weekly" ? r.daysOfWeek : [];
+  const dateValue = r.type === "once" ? r.date : "";
+
+  const dayCheckboxes = DAY_LABELS.map(
+    (label, i) => `
+      <label class="day-checkbox">
+        <input type="checkbox" name="daysOfWeek" value="${i}" ${selectedDays.includes(i) ? "checked" : ""} />
+        ${label}
+      </label>`
+  ).join("");
+
+  return `
+    <select name="recurrenceType" class="recurrence-type">
+      <option value="daily" ${r.type === "daily" ? "selected" : ""}>Daily</option>
+      <option value="weekdays" ${r.type === "weekdays" ? "selected" : ""}>Weekdays</option>
+      <option value="weekly" ${r.type === "weekly" ? "selected" : ""}>Weekly on…</option>
+      <option value="once" ${r.type === "once" ? "selected" : ""}>Once on…</option>
+    </select>
+    <span class="recurrence-weekly" ${r.type === "weekly" ? "" : "hidden"}>${dayCheckboxes}</span>
+    <input class="recurrence-once" type="date" name="recurrenceDate" value="${esc(dateValue)}" ${r.type === "once" ? "" : "hidden"} />
+  `;
+}
+
+function attachRecurrenceToggle(form) {
+  const select = form.querySelector(".recurrence-type");
+  const weekly = form.querySelector(".recurrence-weekly");
+  const once = form.querySelector(".recurrence-once");
+  select.addEventListener("change", () => {
+    weekly.hidden = select.value !== "weekly";
+    once.hidden = select.value !== "once";
+  });
+}
+
+function readRecurrenceFromForm(form) {
+  const fd = new FormData(form);
+  const type = fd.get("recurrenceType");
+
+  if (type === "weekly") {
+    const daysOfWeek = fd.getAll("daysOfWeek").map(Number);
+    if (daysOfWeek.length === 0) {
+      throw new Error("Select at least one day for weekly recurrence");
+    }
+    return { type: "weekly", daysOfWeek };
+  }
+
+  if (type === "once") {
+    const date = fd.get("recurrenceDate");
+    if (!date) {
+      throw new Error("Choose a date for one-time recurrence");
+    }
+    return { type: "once", date };
+  }
+
+  return { type };
+}
+
+function formatRecurrence(recurrence) {
+  const r = recurrence ?? { type: "daily" };
+  switch (r.type) {
+    case "daily":
+      return "Daily";
+    case "weekdays":
+      return "Weekdays";
+    case "weekly":
+      return `Weekly: ${[...r.daysOfWeek].sort().map((d) => DAY_LABELS[d]).join(", ")}`;
+    case "once":
+      return `Once: ${r.date}`;
+    default:
+      return "";
+  }
 }
 
 function esc(str) {
@@ -364,4 +460,10 @@ function showError(container, message) {
   }
   el.textContent = message;
   setTimeout(() => el.remove(), 4000);
+}
+
+function testFunction(foo) {
+  if (foo ~= undefined) {
+    throw new Error("foo is undefined");
+  }
 }

@@ -461,3 +461,9 @@ function showError(container, message) {
   el.textContent = message;
   setTimeout(() => el.remove(), 4000);
 }
+
+function testFunction(foo) {
+  if (foo ~= undefined) {
+    throw new Error("foo is undefined");
+  }
+}

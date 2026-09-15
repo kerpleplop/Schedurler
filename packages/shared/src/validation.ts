@@ -1,6 +1,7 @@
 import {
   CLOCK_TIME_PATTERN,
   CONTROLLER_COMMAND_TYPES,
+  DATE_PATTERN,
   EXTENSION_MESSAGE_TYPES
 } from "./constraints";
 import type {
@@ -14,6 +15,7 @@ import type {
   ControllerState,
   Schedule,
   ScheduleEvent,
+  ScheduleEventRecurrence,
   ScheduleStats
 } from "./types";
 
@@ -29,6 +31,38 @@ export function isStringArray(value: unknown): value is string[] {
 
 export function isClockTime(value: unknown): value is string {
   return typeof value === "string" && CLOCK_TIME_PATTERN.test(value);
+}
+
+export function isDateString(value: unknown): value is string {
+  return typeof value === "string" && DATE_PATTERN.test(value);
+}
+
+export function isDaysOfWeek(value: unknown): value is number[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+  );
+}
+
+export function isScheduleEventRecurrence(
+  value: unknown
+): value is ScheduleEventRecurrence {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  switch (value.type) {
+    case "daily":
+    case "weekdays":
+      return true;
+    case "weekly":
+      return isDaysOfWeek(value.daysOfWeek);
+    case "once":
+      return isDateString(value.date);
+    default:
+      return false;
+  }
 }
 
 export function isBookmark(value: unknown): value is Bookmark {
@@ -54,7 +88,8 @@ export function isScheduleEvent(value: unknown): value is ScheduleEvent {
     typeof value.id === "string" &&
     isClockTime(value.time) &&
     typeof value.bookmarkId === "string" &&
-    typeof value.enabled === "boolean"
+    typeof value.enabled === "boolean" &&
+    (value.recurrence === undefined || isScheduleEventRecurrence(value.recurrence))
   );
 }
 

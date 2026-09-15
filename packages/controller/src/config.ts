@@ -8,6 +8,7 @@ import {
 import type { StoragePaths } from "./storage/paths";
 import { writeJsonFile } from "./storage/jsonFile";
 
+// Resolved controller settings plus the fixed extension WebSocket path.
 export type ControllerRuntimeConfig = {
   settings: ControllerSettings;
   wsPath: string;

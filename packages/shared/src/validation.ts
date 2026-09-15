@@ -2,7 +2,7 @@ import {
   CLOCK_TIME_PATTERN,
   CONTROLLER_COMMAND_TYPES,
   EXTENSION_MESSAGE_TYPES
-} from "./constraints";
+} from "./limits";
 import type {
   ControllerToExtensionMessage,
   ExtensionToControllerMessage

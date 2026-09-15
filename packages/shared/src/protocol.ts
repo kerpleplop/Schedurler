@@ -2,7 +2,7 @@ import type { ActiveTabActionSource, TabEntry } from "./types";
 import {
   CONTROLLER_COMMAND_TYPES,
   EXTENSION_MESSAGE_TYPES
-} from "./constraints";
+} from "./limits";
 
 export type ControllerCommandType = (typeof CONTROLLER_COMMAND_TYPES)[number];
 export type ExtensionMessageType = (typeof EXTENSION_MESSAGE_TYPES)[number];

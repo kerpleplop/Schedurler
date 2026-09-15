@@ -1,3 +1,4 @@
+// Bounds memory use; oldest entries are dropped once this cap is hit.
 const MAX_ENTRIES = 500;
 
 export type LogLevel = "info" | "warn" | "error";

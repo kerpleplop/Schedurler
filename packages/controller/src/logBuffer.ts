@@ -2,6 +2,7 @@ const MAX_ENTRIES = 500;
 
 export type LogLevel = "info" | "warn" | "error";
 
+/** In-memory ring buffer of recent log entries. */
 export type LogEntry = {
   timestamp: string;
   level: LogLevel;

@@ -35,6 +35,7 @@ export function loadControllerConfig(
   };
 }
 
+// Persists the fully-resolved settings object so future boots can skip env re-resolution.
 export async function persistResolvedSettings(
   storagePaths: StoragePaths,
   settings: ControllerSettings

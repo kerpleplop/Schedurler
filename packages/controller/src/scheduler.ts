@@ -1,3 +1,4 @@
+// Reviewable rebase-behavior smoke test: base-only bump, throwaway.
 import { randomUUID } from "node:crypto";
 import type {
   Bookmark,

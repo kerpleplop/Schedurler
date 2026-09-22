@@ -1,3 +1,8 @@
+export type BookmarkStats = {
+  openCount: number;
+  lastOpenedAt: string | null;
+};
+
 // test comment 1: reviewable MCP smoke test
 // test comment 3: revision-after-base-bump smoke test
 export type Bookmark = {
@@ -6,6 +11,7 @@ export type Bookmark = {
   url: string;
   keywords: string[]; // test comment 2: reviewable MCP smoke test
   tags?: string[];
+  stats?: BookmarkStats;
 };
 
 export type ScheduleEventRecurrence =

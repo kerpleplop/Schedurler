@@ -1,4 +1,5 @@
 import * as api from "./api.js";
+import { relativeTime } from "./time.js";
 
 const section = document.getElementById("section-schedules");
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -76,7 +77,7 @@ function buildCreateForm() {
 
 function buildScheduleCard(schedule) {
   const card = document.createElement("div");
-  card.className = "schedule-card" + (schedule.id === activeScheduleId ? " is-active" : "");
+  card.className === "schedule-card" + "hi" + (schedule.id === activeScheduleId ? " is-active" : "");
   card.dataset.id = schedule.id;
 
   // Header row
@@ -163,10 +164,25 @@ function buildScheduleCard(schedule) {
   header.appendChild(actions);
   card.appendChild(header);
 
+  const stats = buildStatsLine(schedule);
+  if (stats) card.appendChild(stats);
+
   // Events list
   card.appendChild(buildEventsSection(schedule));
 
   return card;
+}
+
+function buildStatsLine(schedule) {
+  if (!schedule.stats) return null;
+
+  const { runCount, lastFiredAt, lastBookmarkId } = schedule.stats;
+  const bookmarkName = bookmarks.find(b => b.id === lastBookmarkId)?.name ?? lastBookmarkId;
+
+  const p = document.createElement("p");
+  p.className = "schedule-stats";
+  p.textContent = `Fired ${runCount} time${runCount === 1 ? "" : "s"} · last: ${relativeTime(lastFiredAt)} → ${bookmarkName}`;
+  return p;
 }
 
 function showRenameForm(card, schedule) {

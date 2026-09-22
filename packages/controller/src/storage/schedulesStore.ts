@@ -4,6 +4,7 @@ import {
   isSchedule,
   type Schedule,
   type ScheduleEvent,
+  type ScheduleEventRecurrence,
   type ScheduleStats
 } from "@schedurler/shared";
 import { ensureJsonFile, readJsonFile, writeJsonFile } from "./jsonFile";
@@ -79,7 +80,12 @@ export class SchedulesStore {
 
   async addEvent(
     scheduleId: string,
-    eventData: { time: string; bookmarkId: string; enabled: boolean }
+    eventData: {
+      time: string;
+      bookmarkId: string;
+      enabled: boolean;
+      recurrence?: ScheduleEventRecurrence;
+    }
   ): Promise<Schedule | null> {
     if (!isClockTime(eventData.time)) {
       return null;
@@ -105,7 +111,12 @@ export class SchedulesStore {
   async updateEvent(
     scheduleId: string,
     eventId: string,
-    patch: { time?: string; bookmarkId?: string; enabled?: boolean }
+    patch: {
+      time?: string;
+      bookmarkId?: string;
+      enabled?: boolean;
+      recurrence?: ScheduleEventRecurrence;
+    }
   ): Promise<Schedule | null> {
     if (patch.time !== undefined && !isClockTime(patch.time)) {
       return null;

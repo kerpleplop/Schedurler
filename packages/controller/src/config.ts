@@ -8,6 +8,7 @@ import {
 import type { StoragePaths } from "./storage/paths";
 import { writeJsonFile } from "./storage/jsonFile";
 
+// Resolved controller settings plus the fixed extension WebSocket path.
 export type ControllerRuntimeConfig = {
   settings: ControllerSettings;
   wsPath: string;
@@ -34,6 +35,7 @@ export function loadControllerConfig(
   };
 }
 
+// Persists the fully-resolved settings object so future boots can skip env re-resolution.
 export async function persistResolvedSettings(
   storagePaths: StoragePaths,
   settings: ControllerSettings

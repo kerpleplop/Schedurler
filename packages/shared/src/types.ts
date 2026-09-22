@@ -3,20 +3,30 @@ export type BookmarkStats = {
   lastOpenedAt: string | null;
 };
 
+// test comment 1: reviewable MCP smoke test
+// test comment 3: revision-after-base-bump smoke test
 export type Bookmark = {
   id: string;
   name: string;
   url: string;
-  keywords: string[];
+  keywords: string[]; // test comment 2: reviewable MCP smoke test
   tags?: string[];
   stats?: BookmarkStats;
 };
+
+export type ScheduleEventRecurrence =
+  | { type: "daily" }
+  | { type: "weekdays" }
+  | { type: "weekly"; daysOfWeek: number[] }
+  | { type: "once"; date: string }; // test comment 3: reviewable MCP smoke test
 
 export type ScheduleEvent = {
   id: string;
   time: string;
   bookmarkId: string;
   enabled: boolean;
+  /** Defaults to { type: "daily" } when omitted, for backward compatibility. */
+  recurrence?: ScheduleEventRecurrence;
 };
 
 export type ScheduleStats = {

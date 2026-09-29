@@ -10,6 +10,7 @@ import type {
   ScheduleEventRecurrence
 } from "@schedurler/shared";
 import type { BookmarksStore } from "./storage/bookmarksStore";
+import type { DevicesStore } from "./storage/devicesStore";
 import type { ControllerStateStore } from "./storage/controllerStateStore";
 import type { SchedulesStore } from "./storage/schedulesStore";
 import type { ControllerSocketServer } from "./ws/socketServer";
@@ -22,6 +23,7 @@ export type ScheduleRunnerOptions = {
   stateRef: { current: ControllerState };
   schedulesStore: SchedulesStore;
   bookmarksStore: BookmarksStore;
+  devicesStore: DevicesStore;
   socketServer: ControllerSocketServer;
   controllerStateStore: ControllerStateStore;
   browserSocketServer: BrowserSocketServer;
@@ -138,28 +140,38 @@ export class ScheduleRunner {
   }
 
   /**
-   * Close the dedicated schedule tab (if one exists).
+   * Close the dedicated schedule tab on every device that has one.
    * Called when a schedule is deactivated.
    */
   deactivateNow(): void {
     const { stateRef, socketServer, onLog } = this.options;
-    const tabId = stateRef.current.scheduleTabId;
 
-    if (tabId !== null) {
+    for (const [deviceId, tabId] of Object.entries(stateRef.current.scheduleTabIds)) {
       const command: CloseTabCommand = {
         type: "close_tab",
         commandId: randomUUID(),
         sentAt: new Date().toISOString(),
         tabId
       };
-      const sent = socketServer.sendCommand(command);
+      const sent = socketServer.sendCommand(command, deviceId);
       if (sent) {
         onLog("info", "Schedule deactivated: closed tab");
       }
     }
   }
 
-  /** Send an open/update command for one schedule event and update state. Returns whether the command was actually sent. */
+  /** Event targets override schedule targets; with neither set, every connected device is targeted. */
+  private resolveTargetIds(schedule: Schedule, event: ScheduleEvent): string[] {
+    const explicit = event.targetDeviceIds?.length
+      ? event.targetDeviceIds
+      : schedule.targetDeviceIds;
+
+    return explicit && explicit.length > 0
+      ? explicit
+      : this.options.socketServer.getConnectedDeviceIds();
+  }
+
+  /** Send an open/update command for one schedule event and update state. Returns whether the command reached at least one device. */
   private async fireEvent(
     schedule: Schedule,
     event: ScheduleEvent,
@@ -171,6 +183,7 @@ export class ScheduleRunner {
       controllerStateStore,
       browserSocketServer,
       schedulesStore,
+      devicesStore,
       onLog
     } = this.options;
 
@@ -184,21 +197,9 @@ export class ScheduleRunner {
       return false;
     }
 
-    const existingTabId = stateRef.current.scheduleTabId ?? undefined;
+    const targetIds = this.resolveTargetIds(schedule, event);
 
-    const command: OpenUrlCommand = {
-      type: "open_url",
-      commandId: randomUUID(),
-      sentAt: new Date().toISOString(),
-      url: bookmark.url,
-      bookmarkId: bookmark.id,
-      source: "schedule",
-      ...(existingTabId !== undefined ? { tabId: existingTabId } : {})
-    };
-
-    const sent = socketServer.sendCommand(command);
-
-    if (!sent) {
+    if (targetIds.length === 0) {
       onLog(
         "warn",
         `Schedule "${schedule.name}": ${event.time} — no extension connected, skipped "${bookmark.name}"`
@@ -206,28 +207,65 @@ export class ScheduleRunner {
       return false;
     }
 
-    const action = existingTabId !== undefined ? "updated tab to" : "opened";
-    onLog("info", `Schedule "${schedule.name}": ${action} "${bookmark.name}" at ${event.time}`);
+    const deviceNames = new Map((await devicesStore.list()).map((d) => [d.id, d.name]));
+    const sentAt = new Date().toISOString();
+    let deliveredCount = 0;
 
-    await this.options.schedulesStore.recordFire(schedule.id, bookmark.id, command.sentAt);
-    const schedules = await this.options.schedulesStore.list();
-    browserSocketServer.broadcast({ type: "schedules_updated", schedules });
+    for (const deviceId of targetIds) {
+      const deviceName = deviceNames.get(deviceId) ?? deviceId;
+      const existingTabId = stateRef.current.scheduleTabIds[deviceId];
 
-    await this.options.bookmarksStore.recordOpen(bookmark.id, command.sentAt);
-    const updatedBookmarks = await this.options.bookmarksStore.list();
-    browserSocketServer.broadcast({ type: "bookmarks_updated", bookmarks: updatedBookmarks });
+      const command: OpenUrlCommand = {
+        type: "open_url",
+        commandId: randomUUID(),
+        sentAt,
+        url: bookmark.url,
+        bookmarkId: bookmark.id,
+        source: "schedule",
+        ...(existingTabId !== undefined ? { tabId: existingTabId } : {})
+      };
 
+      if (!socketServer.sendCommand(command, deviceId)) {
+        onLog(
+          "warn",
+          `Schedule "${schedule.name}": ${event.time} — ${deviceName} not connected, skipped "${bookmark.name}"`
+        );
+        continue;
+      }
+
+      deliveredCount += 1;
+      const action = existingTabId !== undefined ? "updated tab to" : "opened";
+      onLog(
+        "info",
+        `Schedule "${schedule.name}": ${action} "${bookmark.name}" at ${event.time} on ${deviceName}`
+      );
+    }
+
+    if (deliveredCount === 0) {
+      return false;
+    }
+
+    // Update in-memory state before any await: devices may answer with tab_opened at once,
+    // and that reply is attributed to a schedule only if the action is already marked as one.
     stateRef.current = {
       ...stateRef.current,
       currentBookmarkId: bookmark.id,
       activeTabAction: {
         bookmarkId: bookmark.id,
         url: bookmark.url,
-        startedAt: command.sentAt,
+        startedAt: sentAt,
         source: "schedule",
         status: "pending"
       }
     };
+
+    await this.options.schedulesStore.recordFire(schedule.id, bookmark.id, sentAt);
+    const schedules = await this.options.schedulesStore.list();
+    browserSocketServer.broadcast({ type: "schedules_updated", schedules });
+
+    await this.options.bookmarksStore.recordOpen(bookmark.id, sentAt);
+    const updatedBookmarks = await this.options.bookmarksStore.list();
+    browserSocketServer.broadcast({ type: "bookmarks_updated", bookmarks: updatedBookmarks });
 
     await controllerStateStore.save(stateRef.current);
 
@@ -238,7 +276,7 @@ export class ScheduleRunner {
     });
 
     // Only retire a one-time event once it has actually fired, so a missing
-    // bookmark or a disconnected extension leaves it enabled to try again.
+    // bookmark or no reachable device leaves it enabled to try again.
     if (event.recurrence?.type === "once") {
       await schedulesStore.updateEvent(schedule.id, event.id, { enabled: false });
       browserSocketServer.broadcast({

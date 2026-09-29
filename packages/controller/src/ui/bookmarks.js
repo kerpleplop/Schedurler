@@ -4,13 +4,28 @@ import { relativeTime } from "./time.js";
 const section = document.getElementById("section-bookmarks");
 
 let bookmarks = [];
+let devices = [];
+// Device id the "Open" buttons send to; "" means every connected device.
+let openTargetId = "";
 
 export function setBookmarks(data) {
   bookmarks = data;
   render();
 }
 
-export async function init() {
+// devices_updated fires on every tab change; only re-render when the list a user could pick from changes.
+export function setDevices(data) {
+  const changed = deviceSignature(data) !== deviceSignature(devices);
+  devices = data;
+  if (changed) render();
+}
+
+function deviceSignature(list) {
+  return JSON.stringify(list.map(d => [d.id, d.name]));
+}
+
+export async function init(deviceList) {
+  devices = deviceList ?? [];
   bookmarks = await api.listBookmarks();
   render();
 }
@@ -24,6 +39,9 @@ function render() {
 
   const createForm = buildCreateForm();
   section.appendChild(createForm);
+
+  const targetPicker = buildOpenTargetPicker();
+  if (targetPicker) section.appendChild(targetPicker);
 
   if (bookmarks.length === 0) {
     const empty = document.createElement("p");
@@ -41,6 +59,32 @@ function render() {
   }
 
   section.appendChild(list);
+}
+
+function buildOpenTargetPicker() {
+  if (devices.length < 2) return null;
+
+  if (openTargetId !== "" && !devices.some(d => d.id === openTargetId)) {
+    openTargetId = "";
+  }
+
+  const label = document.createElement("label");
+  label.className = "open-target";
+  label.append("Open on: ");
+
+  const select = document.createElement("select");
+  const allOption = new Option("All connected devices", "");
+  select.appendChild(allOption);
+  for (const device of devices) {
+    select.appendChild(new Option(device.name, device.id));
+  }
+  select.value = openTargetId;
+  select.addEventListener("change", () => {
+    openTargetId = select.value;
+  });
+
+  label.appendChild(select);
+  return label;
 }
 
 function buildCreateForm() {
@@ -95,7 +139,7 @@ function buildBookmarkRow(bookmark) {
   openBtn.title = "Send to connected extension";
   openBtn.addEventListener("click", async () => {
     try {
-      await api.openUrl(bookmark.url, bookmark.id);
+      await api.openUrl(bookmark.url, bookmark.id, openTargetId ? [openTargetId] : undefined);
     } catch (err) {
       showError(section, err.message);
     }

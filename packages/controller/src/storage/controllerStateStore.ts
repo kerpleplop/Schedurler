@@ -13,10 +13,14 @@ export class ControllerStateStore {
       throw new Error(`Invalid controller state data in ${this.filePath}`);
     }
 
-    // Migrate older persisted state that predates scheduleTabId
+    // Migrate older persisted state that predates per-device scheduleTabIds.
+    // A legacy single scheduleTabId is dropped: tab ids don't survive a restart anyway.
+    const { scheduleTabId: _legacyScheduleTabId, ...rest } = data as ControllerState & {
+      scheduleTabId?: unknown;
+    };
     return {
-      ...data,
-      scheduleTabId: data.scheduleTabId ?? null
+      ...rest,
+      scheduleTabIds: data.scheduleTabIds ?? {}
     };
   }
 

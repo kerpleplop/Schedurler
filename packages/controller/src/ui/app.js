@@ -1,6 +1,7 @@
 import * as bookmarksSection from "./bookmarks.js";
 import * as schedulesSection from "./schedules.js";
 import * as tabsSection from "./tabs.js";
+import * as devicesSection from "./devices.js";
 import * as logsSection from "./logs.js";
 import * as api from "./api.js";
 
@@ -18,6 +19,7 @@ const sections = {
   bookmarks: document.getElementById("section-bookmarks"),
   schedules: document.getElementById("section-schedules"),
   tabs: document.getElementById("section-tabs"),
+  devices: document.getElementById("section-devices"),
   logs: document.getElementById("section-logs")
 };
 
@@ -87,6 +89,11 @@ function connect() {
       schedulesSection.setSchedules(allSchedules);
     } else if (msg.type === "tabs_updated") {
       tabsSection.setTabs(msg.tabs);
+    } else if (msg.type === "devices_updated") {
+      devicesSection.setDevices(msg.devices);
+      bookmarksSection.setDevices(msg.devices);
+      schedulesSection.setDevices(msg.devices);
+      tabsSection.setDevices(msg.devices);
     } else if (msg.type === "log_entry") {
       logsSection.appendEntry(msg.entry);
     }
@@ -110,12 +117,13 @@ function connect() {
 
 async function init() {
   try {
-    const [stateData, fetchedBookmarks, fetchedSchedules, logsData, fetchedTabs] = await Promise.all([
+    const [stateData, fetchedBookmarks, fetchedSchedules, logsData, fetchedTabs, fetchedDevices] = await Promise.all([
       api.getState(),
       api.listBookmarks(),
       api.listSchedules(),
       api.getLogs(),
-      api.getTabs()
+      api.getTabs(),
+      api.listDevices()
     ]);
 
     allBookmarks = fetchedBookmarks;
@@ -123,10 +131,11 @@ async function init() {
 
     updateStatusBar(stateData.state, stateData.extensionConnections);
 
-    await bookmarksSection.init(allBookmarks);
-    await schedulesSection.init(allBookmarks);
+    await bookmarksSection.init(fetchedDevices);
+    await schedulesSection.init(allBookmarks, fetchedDevices);
     schedulesSection.setActiveScheduleId(stateData.state.activeScheduleId);
-    tabsSection.init(fetchedTabs);
+    tabsSection.init(fetchedTabs, fetchedDevices);
+    devicesSection.init(fetchedDevices);
     logsSection.init(logsData);
 
     connect();

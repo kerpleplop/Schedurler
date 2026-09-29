@@ -127,6 +127,13 @@ button.btn-danger:hover { background: #fff0f0; }
 .event-info code { font-size: 12px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; }
 .event-recurrence { font-size: 12px; color: #777; }
 
+.event-targets { font-size: 12px; color: #1a5adb; }
+.schedule-targets { font-size: 12px; color: #555; margin: 0 0 0.5rem; }
+.schedule-targets button { padding: 0.1rem 0.4rem; font-size: 11px; }
+.target-fields { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.field-label { font-size: 12px; color: #777; }
+.open-target { display: inline-block; margin-bottom: 0.75rem; font-size: 13px; }
+
 .recurrence-weekly { display: inline-flex; flex-wrap: wrap; gap: 0.4rem; }
 .day-checkbox { display: inline-flex; align-items: center; gap: 0.15rem; font-size: 12px; }
 
@@ -259,6 +266,13 @@ button.btn-danger:hover { background: #fff0f0; }
   color: #aaa;
   margin-top: 0.15rem;
 }
+
+/* Devices */
+.device-name { font-size: 14px; }
+.badge-online, .badge-offline { font-size: 11px; padding: 2px 6px; border-radius: 3px; margin-left: 0.4rem; }
+.badge-online { background: #2a7; color: #fff; }
+.badge-offline { background: #ddd; color: #555; }
+.device-meta { font-size: 11px; color: #888; }
 
 /* Misc */
 .empty { color: #888; font-size: 13px; margin: 0.5rem 0; }

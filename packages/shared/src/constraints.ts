@@ -1,5 +1,6 @@
 export const BOOKMARKS_FILE_NAME = "bookmarks.json";
 export const SCHEDULES_FILE_NAME = "schedules.json";
+export const DEVICES_FILE_NAME = "devices.json";
 export const CONTROLLER_STATE_FILE_NAME = "controllerState.json";
 export const SETTINGS_FILE_NAME = "settings.json";
 

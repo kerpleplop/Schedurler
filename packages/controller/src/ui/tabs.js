@@ -3,14 +3,21 @@ import * as api from "./api.js";
 const section = document.getElementById("section-tabs");
 
 let tabs = [];
+let devices = [];
 
-export function init(initialTabs) {
+export function init(initialTabs, initialDevices) {
   tabs = initialTabs ?? [];
+  devices = initialDevices ?? [];
   render();
 }
 
 export function setTabs(data) {
   tabs = data;
+  render();
+}
+
+export function setDevices(data) {
+  devices = data;
   render();
 }
 
@@ -24,17 +31,30 @@ function render() {
   if (tabs.length === 0) {
     const empty = document.createElement("p");
     empty.className = "empty";
-    empty.textContent = "No open tabs reported by the extension.";
+    empty.textContent = "No open tabs reported by any device.";
     section.appendChild(empty);
     return;
   }
 
-  const grid = document.createElement("div");
-  grid.className = "tab-grid";
-  section.appendChild(grid);
-
+  // Tab ids are only unique within one browser, so tabs are grouped per device.
+  const byDevice = new Map();
   for (const tab of tabs) {
-    grid.appendChild(buildTabCard(tab));
+    if (!byDevice.has(tab.deviceId)) byDevice.set(tab.deviceId, []);
+    byDevice.get(tab.deviceId).push(tab);
+  }
+
+  for (const [deviceId, deviceTabs] of byDevice) {
+    const heading = document.createElement("h4");
+    heading.textContent = devices.find(d => d.id === deviceId)?.name ?? deviceId;
+    section.appendChild(heading);
+
+    const grid = document.createElement("div");
+    grid.className = "tab-grid";
+    section.appendChild(grid);
+
+    for (const tab of deviceTabs) {
+      grid.appendChild(buildTabCard(tab));
+    }
   }
 }
 
@@ -75,7 +95,7 @@ function buildTabCard(tab) {
   closeBtn.addEventListener("click", async () => {
     try {
       closeBtn.disabled = true;
-      await api.closeTab(tab.tabId);
+      await api.closeTab(tab.deviceId, tab.tabId);
     } catch (err) {
       closeBtn.disabled = false;
       showError(section, err.message);

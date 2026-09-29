@@ -14,6 +14,7 @@ import type {
   BookmarkStats,
   ControllerSettings,
   ControllerState,
+  Device,
   Schedule,
   ScheduleEvent,
   ScheduleEventRecurrence,
@@ -77,6 +78,20 @@ export function isScheduleEventRecurrence(
   }
 }
 
+export function isDevice(value: unknown): value is Device {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.id === "string" &&
+    value.id !== "" &&
+    typeof value.name === "string" &&
+    value.browser === "firefox" &&
+    (value.lastSeenAt === null || typeof value.lastSeenAt === "string")
+  );
+}
+
 export function isBookmark(value: unknown): value is Bookmark {
   if (!isRecord(value)) {
     return false;
@@ -102,7 +117,8 @@ export function isScheduleEvent(value: unknown): value is ScheduleEvent {
     isClockTime(value.time) &&
     typeof value.bookmarkId === "string" &&
     typeof value.enabled === "boolean" &&
-    (value.recurrence === undefined || isScheduleEventRecurrence(value.recurrence))
+    (value.recurrence === undefined || isScheduleEventRecurrence(value.recurrence)) &&
+    (value.targetDeviceIds === undefined || isStringArray(value.targetDeviceIds))
   );
 }
 
@@ -127,7 +143,8 @@ export function isSchedule(value: unknown): value is Schedule {
     typeof value.id === "string" &&
     typeof value.name === "string" &&
     value.events.every(isScheduleEvent) &&
-    (value.stats === undefined || isScheduleStats(value.stats))
+    (value.stats === undefined || isScheduleStats(value.stats)) &&
+    (value.targetDeviceIds === undefined || isStringArray(value.targetDeviceIds))
   );
 }
 
@@ -168,10 +185,11 @@ export function isControllerState(value: unknown): value is ControllerState {
     return false;
   }
 
-  const hasValidScheduleTabId =
-    value.scheduleTabId === undefined ||
-    value.scheduleTabId === null ||
-    Number.isInteger(value.scheduleTabId);
+  // Older persisted state predates scheduleTabIds (it had a single scheduleTabId).
+  const hasValidScheduleTabIds =
+    value.scheduleTabIds === undefined ||
+    (isRecord(value.scheduleTabIds) &&
+      Object.values(value.scheduleTabIds).every((tabId) => Number.isInteger(tabId)));
 
   return (
     typeof value.controllerId === "string" &&
@@ -181,7 +199,7 @@ export function isControllerState(value: unknown): value is ControllerState {
     (value.currentBookmarkId === null ||
       typeof value.currentBookmarkId === "string") &&
     isActiveTabAction(value.activeTabAction) &&
-    hasValidScheduleTabId
+    hasValidScheduleTabIds
   );
 }
 
@@ -263,6 +281,9 @@ export function isExtensionToControllerMessage(
     case "hello":
       return (
         typeof value.extensionId === "string" &&
+        typeof value.deviceId === "string" &&
+        value.deviceId !== "" &&
+        (value.deviceName === undefined || typeof value.deviceName === "string") &&
         value.browser === "firefox" &&
         typeof value.connectedAt === "string" &&
         (value.version === undefined || typeof value.version === "string")

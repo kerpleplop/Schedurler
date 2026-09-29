@@ -43,10 +43,29 @@ async function getControllerWsUrl() {
   return DEFAULT_CONTROLLER_WS_URL;
 }
 
-function handleOpen() {
+// Stable per-install id so the controller can tell devices apart across reconnects.
+// The display name is only a suggestion; the controller lets users rename devices.
+async function getDeviceIdentity() {
+  const stored = await browser.storage.local.get("deviceId");
+  let deviceId = stored.deviceId;
+
+  if (typeof deviceId !== "string" || deviceId.length === 0) {
+    deviceId = crypto.randomUUID();
+    await browser.storage.local.set({ deviceId });
+  }
+
+  const { os } = await browser.runtime.getPlatformInfo();
+  return { deviceId, deviceName: `Firefox (${os})` };
+}
+
+async function handleOpen() {
+  const { deviceId, deviceName } = await getDeviceIdentity();
+
   sendMessage({
     type: "hello",
     extensionId: "schedurler-firefox-agent",
+    deviceId,
+    deviceName,
     browser: "firefox",
     connectedAt: new Date().toISOString(),
     version: browser.runtime.getManifest().version

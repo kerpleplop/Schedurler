@@ -8,7 +8,7 @@ The intended finished product is a single controller running on one machine and 
 - One controller instance runs at a time and remains the source of truth for bookmarks, schedules, and device-local active state.
 - The controller will host a user-friendly web app for trusted local-network use only, not public-internet deployment.
 - Multiple web clients may be connected to the controller web UI at the same time.
-- Multiple Firefox extensions may be connected to the controller at the same time so the same bookmark or schedule action can be applied across multiple computers.
+- Multiple Firefox extensions may be connected to the controller at the same time so the same bookmark or schedule action can be applied across multiple computers. Each extension install is a named device; schedules and individual events can target specific devices, and default to every connected device.
 - Bookmarks are saved in the controller-owned library and should support create, edit, rename, keyword tagging, sorting, and manual loading.
 - Schedules are controller-owned 24-hour cycle definitions that map saved bookmarks to times of day and should support create, edit, rename, duplicate, activate, and event-level changes.
 - The extension remains thin: it executes controller-issued browser actions and reports results back, but it does not own bookmark or schedule data.
@@ -45,7 +45,7 @@ The intended finished product is a single controller running on one machine and 
    ```
 
 ## Environment Variables
-- `SHARED_DATA_DIR`: shared path for `bookmarks.json` and `schedules.json`
+- `SHARED_DATA_DIR`: shared path for `bookmarks.json`, `schedules.json`, and `devices.json`
 - `LOCAL_DATA_DIR`: local path for `controllerState.json` and `settings.json`
 - `HOST`: controller bind host, defaults to `127.0.0.1`
 - `PORT`: controller port, defaults to `4312`

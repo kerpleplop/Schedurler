@@ -20,6 +20,14 @@ export type ScheduleEventRecurrence =
   | { type: "weekly"; daysOfWeek: number[] }
   | { type: "once"; date: string }; // test comment 3: reviewable MCP smoke test
 
+/** A browser (one Firefox extension install) the controller can send tab actions to. */
+export type Device = {
+  id: string;
+  name: string;
+  browser: "firefox";
+  lastSeenAt: string | null;
+};
+
 export type ScheduleEvent = {
   id: string;
   time: string;
@@ -27,6 +35,8 @@ export type ScheduleEvent = {
   enabled: boolean;
   /** Defaults to { type: "daily" } when omitted, for backward compatibility. */
   recurrence?: ScheduleEventRecurrence;
+  /** Overrides the schedule's targets. Omitted or empty means "use the schedule's targets". */
+  targetDeviceIds?: string[];
 };
 
 export type ScheduleStats = {
@@ -40,6 +50,8 @@ export type Schedule = {
   name: string;
   events: ScheduleEvent[];
   stats?: ScheduleStats;
+  /** Omitted or empty means every connected device. */
+  targetDeviceIds?: string[];
 };
 
 export type ActiveTabActionSource = "manual" | "schedule" | "system";
@@ -60,7 +72,8 @@ export type ControllerState = {
   scheduleEnabled: boolean;
   currentBookmarkId: string | null;
   activeTabAction: ActiveTabAction;
-  scheduleTabId: number | null;
+  /** Dedicated schedule tab per device, keyed by device id. Tab ids are only unique within one browser. */
+  scheduleTabIds: Record<string, number>;
 };
 
 export type ControllerSettings = {

@@ -59,7 +59,13 @@ The controller runs **two separate WebSocket servers** on the same HTTP port, di
 | `/ws` | `ControllerSocketServer` | Extension ↔ controller (bidirectional, ping/pong heartbeat) |
 | `/ws/ui` | `BrowserSocketServer` | Controller → browser UI (broadcast-only push) |
 
-`ControllerSocketServer` receives `ExtensionToControllerMessage` frames and sends `ControllerToExtensionMessage` commands. `BrowserSocketServer` only broadcasts `BrowserEvent` objects (`state_update`, `bookmarks_updated`, `schedules_updated`, `tabs_updated`, `log_entry`) — it never receives messages from the UI.
+`ControllerSocketServer` receives `ExtensionToControllerMessage` frames and sends `ControllerToExtensionMessage` commands. `BrowserSocketServer` only broadcasts `BrowserEvent` objects (`state_update`, `bookmarks_updated`, `schedules_updated`, `tabs_updated`, `devices_updated`, `log_entry`) — it never receives messages from the UI.
+
+### Devices
+
+Each Firefox extension install is a **device**. The extension generates a stable `deviceId` (kept in `browser.storage.local`) and sends it in `hello`; `ControllerSocketServer` binds that id to the socket, so every command is addressed to one device (`sendCommand(command, deviceId)`) and every later message is attributed to it. Messages from a socket that has not said hello are ignored. If the same device reconnects before its old socket times out, the newest socket wins.
+
+The controller keeps a registry of known devices in `devices.json` (`DevicesStore`); the display name comes from the extension the first time and can be renamed in the UI. Online status is live (from the socket), not stored. Tab ids are only unique within one browser, so the in-memory `TabRegistry` and the schedule tab (`ControllerState.scheduleTabIds`) are keyed by device id.
 
 The extension reads `controllerWsUrl` from `browser.storage.local` to override the default `ws://127.0.0.1:4312/ws`. This is how users configure the extension to connect to a controller on the LAN.
 
@@ -76,21 +82,24 @@ All routes are in `packages/controller/src/server.ts`. There is no router librar
 | `GET/POST` | `/api/bookmarks` | List / create bookmarks |
 | `PATCH/DELETE` | `/api/bookmarks/:id` | Update / delete bookmark |
 | `GET/POST` | `/api/schedules` | List / create schedules |
-| `PATCH/DELETE` | `/api/schedules/:id` | Update / delete schedule |
+| `PATCH/DELETE` | `/api/schedules/:id` | Update (`name` and/or `targetDeviceIds`) / delete schedule |
 | `POST` | `/api/schedules/:id/duplicate` | Clone a schedule |
 | `POST` | `/api/schedules/:id/activate` | Activate + immediately fire most-recent event |
 | `POST` | `/api/schedules/:id/deactivate` | Deactivate + close schedule tab |
-| `POST` | `/api/schedules/:id/events` | Add an event to a schedule |
+| `POST` | `/api/schedules/:id/events` | Add an event to a schedule (optional `targetDeviceIds`) |
 | `PATCH/DELETE` | `/api/schedules/:scheduleId/events/:eventId` | Update / remove an event |
 | `GET` | `/api/state` | Current `ControllerState` |
 | `POST` | `/api/state/schedule-enabled` | Toggle schedule running |
-| `POST` | `/api/commands/open-url` | Manual one-off open URL command |
-| `GET` | `/api/tabs` | Live tab registry |
-| `DELETE` | `/api/tabs/:tabId` | Close a specific tab |
+| `POST` | `/api/commands/open-url` | Manual one-off open URL command (optional `deviceIds`, default all connected) |
+| `GET` | `/api/devices` | Known devices with `online` and `tabCount` |
+| `PATCH` | `/api/devices/:id` | Rename a device |
+| `DELETE` | `/api/devices/:id` | Forget a device (409 if connected or targeted by a schedule) |
+| `GET` | `/api/tabs` | Live tab registry, all devices (each tab has a `deviceId`) |
+| `DELETE` | `/api/devices/:deviceId/tabs/:tabId` | Close a specific tab on one device |
 
 ### Schedule runner
 
-`ScheduleRunner` (`packages/controller/src/scheduler.ts`) ticks every second and deduplicates by wall-clock minute (`lastFiredMinute`). On activation it calls `activateNow()`, which finds the most-recently-due enabled event and fires it immediately so the correct bookmark opens right away. When a schedule tab already exists (`scheduleTabId`), the runner reuses it by passing `tabId` in the `open_url` command instead of opening a new tab.
+`ScheduleRunner` (`packages/controller/src/scheduler.ts`) ticks every second and deduplicates by wall-clock minute (`lastFiredMinute`). On activation it calls `activateNow()`, which finds the most-recently-due enabled event and fires it immediately so the correct bookmark opens right away. Each event is sent to its target devices: the event's `targetDeviceIds` if set, otherwise the schedule's, otherwise every connected device. A targeted device that is offline is skipped (and logged), never replaced by another device. When a device already has a schedule tab (`scheduleTabIds[deviceId]`), the runner reuses it by passing `tabId` in that device's `open_url` command instead of opening a new tab. A one-time event is retired once it reached at least one device.
 
 ### Extension keepalive tab
 
@@ -100,7 +109,7 @@ The extension maintains a hidden `about:blank` tab (`reservedTabId`) to keep Fir
 
 | Env var | Default (dev) | Files |
 |---|---|---|
-| `SHARED_DATA_DIR` | `./data/shared` | `bookmarks.json`, `schedules.json` |
+| `SHARED_DATA_DIR` | `./data/shared` | `bookmarks.json`, `schedules.json`, `devices.json` |
 | `LOCAL_DATA_DIR` | `./data/local` | `controllerState.json`, `settings.json` |
 
 Use those exact filenames everywhere. `HOST` (default `127.0.0.1`) and `PORT` (default `4312`) control the controller bind address.

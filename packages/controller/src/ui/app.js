@@ -34,8 +34,12 @@ navTabs.forEach((tab) => {
 
 // --- Status bar ---
 
-function updateStatusBar(state, extensionConnections) {
+function updateStatusBar(state, extensionConnections, lastReconnectAttempt = 0) {
   extensionCountEl.textContent = String(extensionConnections);
+  extensionCountEl.classList.toggle("reconnected", lastReconnectAttempt > 0);
+  extensionCountEl.title = lastReconnectAttempt > 0
+    ? `Reconnected after ${lastReconnectAttempt} attempts`
+    : "";
 
   const schedule = allSchedules.find(s => s.id === state.activeScheduleId);
   if (schedule) {
@@ -121,7 +125,7 @@ async function init() {
     allBookmarks = fetchedBookmarks;
     allSchedules = fetchedSchedules;
 
-    updateStatusBar(stateData.state, stateData.extensionConnections);
+    updateStatusBar(stateData.state, stateData.extensionConnections, stateData.lastReconnectAttempt);
 
     await bookmarksSection.init(allBookmarks);
     await schedulesSection.init(allBookmarks);

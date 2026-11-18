@@ -145,7 +145,10 @@ async function handleExtensionMessage(
 
   switch (message.type) {
     case "hello": {
-      log("info", `Extension connected: ${message.browser} v${message.version ?? "unknown"}`);
+      const attempt = message.reconnectAttempt ?? 0;
+      socketServer.recordReconnectAttempt(attempt);
+      const retrySuffix = attempt > 0 ? ` after ${attempt} reconnect attempts` : "";
+      log("info", `Extension connected: ${message.browser} v${message.version ?? "unknown"}${retrySuffix}`);
       // Clear stale scheduleTabId — the tab may no longer exist after a restart
       if (stateRef.current.scheduleTabId !== null) {
         stateRef.current = { ...stateRef.current, scheduleTabId: null };

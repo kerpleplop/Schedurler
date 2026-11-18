@@ -343,7 +343,8 @@ async function handleRequest(
       controllerStateStore: options.controllerStateStore,
       stateRef: options.stateRef,
       browserSocketServer,
-      getExtensionConnectionCount: () => socketServer.getConnectionCount()
+      getExtensionConnectionCount: () => socketServer.getConnectionCount(),
+      getLastReconnectAttempt: () => socketServer.getLastReconnectAttempt()
     });
     return;
   }

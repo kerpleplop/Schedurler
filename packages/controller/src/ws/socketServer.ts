@@ -20,6 +20,7 @@ export class ControllerSocketServer {
   private readonly alive = new WeakSet<WebSocket>();
   private readonly onMessage: ControllerSocketServerOptions["onMessage"];
   private readonly heartbeat: ReturnType<typeof setInterval>;
+  private lastReconnectAttempt = 0;
 
   constructor(options: ControllerSocketServerOptions) {
     this.onMessage = options.onMessage;
@@ -76,6 +77,15 @@ export class ControllerSocketServer {
     }
 
     return count;
+  }
+
+  // Attempts the most recent extension needed before its hello arrived.
+  recordReconnectAttempt(attempt: number): void {
+    this.lastReconnectAttempt = attempt;
+  }
+
+  getLastReconnectAttempt(): number {
+    return this.lastReconnectAttempt;
   }
 
   sendCommand(command: ControllerToExtensionMessage): boolean {

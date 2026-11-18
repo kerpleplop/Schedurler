@@ -58,6 +58,8 @@ export type ExtensionHello = {
   browser: "firefox";
   connectedAt: string;
   version?: string;
+  // Failed attempts before this connection opened; 0 on a first connect.
+  reconnectAttempt?: number;
 };
 
 export type ExtensionStatus = {

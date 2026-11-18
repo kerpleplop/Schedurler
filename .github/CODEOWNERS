@@ -1,0 +1,3 @@
+/packages/shared/ @InspectorShelly
+/packages/controller/src/ws/ @ReviewBunny
+/packages/controller/src/api/ @ReviewBunny

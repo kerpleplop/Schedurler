@@ -55,6 +55,7 @@ function handleOpen() {
     version: browser.runtime.getManifest().version,
     reconnectAttempt
   });
+  reconnectAttempt = 0;
 
   sendStatus("ready", "Connected to controller");
 
@@ -307,8 +308,10 @@ function scheduleReconnect() {
     return;
   }
 
-  // Double the delay after each failed attempt, up to the cap.
-  const delay = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempt, RECONNECT_MAX_DELAY_MS);
+  // Double the delay after each failed attempt, up to the cap, then wait a random time
+  // in its upper half so browsers don't all retry at once after a controller restart.
+  const cappedDelay = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempt, RECONNECT_MAX_DELAY_MS);
+  const delay = cappedDelay / 2 + Math.random() * (cappedDelay / 2);
   reconnectAttempt += 1;
 
   reconnectTimer = setTimeout(() => {

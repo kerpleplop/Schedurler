@@ -26,6 +26,10 @@ export class LogBuffer {
   }
 
   getRecent(count: number): readonly LogEntry[] {
-    return this.entries.slice(-count);
+    return this.entries.slice(-Math.max(0, count));
+  }
+
+  clear(): void {
+    this.entries.length = 0;
   }
 }

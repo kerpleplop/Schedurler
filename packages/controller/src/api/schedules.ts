@@ -1,13 +1,15 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { isClockTime, isScheduleEventRecurrence } from "@schedurler/shared";
+import { isClockTime, isScheduleEventRecurrence, isStringArray } from "@schedurler/shared";
 import type { ControllerState, ScheduleEventRecurrence } from "@schedurler/shared";
 import type { ControllerStateStore } from "../storage/controllerStateStore";
+import type { DevicesStore } from "../storage/devicesStore";
 import type { SchedulesStore } from "../storage/schedulesStore";
 import type { BrowserSocketServer } from "../ws/browserSocketServer";
 import type { ScheduleRunner } from "../scheduler";
 
 type Deps = {
   schedulesStore: SchedulesStore;
+  devicesStore: DevicesStore;
   controllerStateStore: ControllerStateStore;
   stateRef: { current: ControllerState };
   browserSocketServer: BrowserSocketServer;
@@ -32,6 +34,25 @@ function sendJson(response: ServerResponse, status: number, payload: unknown): v
   response.statusCode = status;
   response.setHeader("content-type", "application/json; charset=utf-8");
   response.end(JSON.stringify(payload, null, 2));
+}
+
+/** Validate a targetDeviceIds field: an array of ids of devices the controller knows. Empty means "no override". */
+async function parseTargetDeviceIds(
+  value: unknown,
+  deps: Deps
+): Promise<{ ids: string[] } | { error: string }> {
+  if (!isStringArray(value)) {
+    return { error: "targetDeviceIds must be an array of device ids" };
+  }
+
+  const known = new Set((await deps.devicesStore.list()).map((d) => d.id));
+  const unknown = value.find((id) => !known.has(id));
+
+  if (unknown !== undefined) {
+    return { error: `Unknown device: ${unknown}` };
+  }
+
+  return { ids: Array.from(new Set(value)) };
 }
 
 async function broadcastSchedules(deps: Deps): Promise<void> {
@@ -64,12 +85,36 @@ export async function handleUpdateSchedule(
 ): Promise<void> {
   const body = await readJsonBody(request);
 
-  if (!isRecord(body) || typeof body.name !== "string" || (body.name as string).trim() === "") {
-    sendJson(response, 400, { error: "name is required" });
+  if (!isRecord(body)) {
+    sendJson(response, 400, { error: "Invalid request body" });
     return;
   }
 
-  const schedule = await deps.schedulesStore.update(id, { name: (body.name as string).trim() });
+  const patch: { name?: string; targetDeviceIds?: string[] } = {};
+
+  if (body.name !== undefined) {
+    if (typeof body.name !== "string" || body.name.trim() === "") {
+      sendJson(response, 400, { error: "name must be a non-empty string" });
+      return;
+    }
+    patch.name = body.name.trim();
+  }
+
+  if (body.targetDeviceIds !== undefined) {
+    const parsed = await parseTargetDeviceIds(body.targetDeviceIds, deps);
+    if ("error" in parsed) {
+      sendJson(response, 400, { error: parsed.error });
+      return;
+    }
+    patch.targetDeviceIds = parsed.ids;
+  }
+
+  if (patch.name === undefined && patch.targetDeviceIds === undefined) {
+    sendJson(response, 400, { error: "name or targetDeviceIds is required" });
+    return;
+  }
+
+  const schedule = await deps.schedulesStore.update(id, patch);
 
   if (!schedule) {
     sendJson(response, 404, { error: "Not found" });
@@ -139,7 +184,7 @@ export async function handleActivateSchedule(
     ...deps.stateRef.current,
     activeScheduleId: id,
     scheduleEnabled: true,
-    scheduleTabId: null
+    scheduleTabIds: {}
   };
   await deps.controllerStateStore.save(deps.stateRef.current);
   deps.browserSocketServer.broadcast({
@@ -177,7 +222,7 @@ export async function handleDeactivateSchedule(
     ...deps.stateRef.current,
     activeScheduleId: null,
     scheduleEnabled: false,
-    scheduleTabId: null
+    scheduleTabIds: {}
   };
   await deps.controllerStateStore.save(deps.stateRef.current);
   deps.browserSocketServer.broadcast({
@@ -201,7 +246,7 @@ export async function handleAddEvent(
     return;
   }
 
-  const { time, bookmarkId, enabled, recurrence } = body;
+  const { time, bookmarkId, enabled, recurrence, targetDeviceIds } = body;
 
   if (!isClockTime(time)) {
     sendJson(response, 400, { error: "time must be in HH:MM format (24-hour)" });
@@ -223,11 +268,22 @@ export async function handleAddEvent(
     return;
   }
 
+  let targetIds: string[] | undefined;
+  if (targetDeviceIds !== undefined) {
+    const parsed = await parseTargetDeviceIds(targetDeviceIds, deps);
+    if ("error" in parsed) {
+      sendJson(response, 400, { error: parsed.error });
+      return;
+    }
+    targetIds = parsed.ids;
+  }
+
   const schedule = await deps.schedulesStore.addEvent(scheduleId, {
     time,
     bookmarkId,
     enabled,
-    ...(recurrence !== undefined ? { recurrence: recurrence as ScheduleEventRecurrence } : {})
+    ...(recurrence !== undefined ? { recurrence: recurrence as ScheduleEventRecurrence } : {}),
+    ...(targetIds !== undefined ? { targetDeviceIds: targetIds } : {})
   });
 
   if (!schedule) {
@@ -258,6 +314,7 @@ export async function handleUpdateEvent(
     bookmarkId?: string;
     enabled?: boolean;
     recurrence?: ScheduleEventRecurrence;
+    targetDeviceIds?: string[];
   } = {};
 
   if (body.time !== undefined) {
@@ -290,6 +347,15 @@ export async function handleUpdateEvent(
       return;
     }
     patch.recurrence = body.recurrence;
+  }
+
+  if (body.targetDeviceIds !== undefined) {
+    const parsed = await parseTargetDeviceIds(body.targetDeviceIds, deps);
+    if ("error" in parsed) {
+      sendJson(response, 400, { error: parsed.error });
+      return;
+    }
+    patch.targetDeviceIds = parsed.ids;
   }
 
   const schedule = await deps.schedulesStore.updateEvent(scheduleId, eventId, patch);

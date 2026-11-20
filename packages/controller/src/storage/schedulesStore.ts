@@ -9,6 +9,17 @@ import {
 } from "@schedurler/shared";
 import { ensureJsonFile, readJsonFile, writeJsonFile } from "./jsonFile";
 
+/** Empty target lists mean "no override", so drop the field rather than store []. */
+function withTargets<T extends { targetDeviceIds?: string[] }>(
+  item: T,
+  targetDeviceIds: string[] | undefined
+): T {
+  const { targetDeviceIds: _previous, ...rest } = item;
+  return (targetDeviceIds && targetDeviceIds.length > 0
+    ? { ...rest, targetDeviceIds }
+    : rest) as T;
+}
+
 export class SchedulesStore {
   constructor(private readonly filePath: string) {}
 
@@ -33,7 +44,10 @@ export class SchedulesStore {
     return schedule;
   }
 
-  async update(id: string, patch: { name: string }): Promise<Schedule | null> {
+  async update(
+    id: string,
+    patch: { name?: string; targetDeviceIds?: string[] }
+  ): Promise<Schedule | null> {
     const schedules = await this.list();
     const index = schedules.findIndex((s) => s.id === id);
 
@@ -41,7 +55,13 @@ export class SchedulesStore {
       return null;
     }
 
-    const updated = { ...schedules[index], ...patch };
+    let updated: Schedule = schedules[index];
+    if (patch.name !== undefined) {
+      updated = { ...updated, name: patch.name };
+    }
+    if (patch.targetDeviceIds !== undefined) {
+      updated = withTargets(updated, patch.targetDeviceIds);
+    }
     schedules[index] = updated;
     await writeJsonFile(this.filePath, schedules);
     return updated;
@@ -73,6 +93,9 @@ export class SchedulesStore {
       name: `${source.name} (copy)`,
       events: source.events.map((e) => ({ ...e, id: randomUUID() }))
     };
+    if (source.targetDeviceIds) {
+      copy.targetDeviceIds = [...source.targetDeviceIds];
+    }
 
     await writeJsonFile(this.filePath, [...schedules, copy]);
     return copy;
@@ -85,6 +108,7 @@ export class SchedulesStore {
       bookmarkId: string;
       enabled: boolean;
       recurrence?: ScheduleEventRecurrence;
+      targetDeviceIds?: string[];
     }
   ): Promise<Schedule | null> {
     if (!isClockTime(eventData.time)) {
@@ -98,7 +122,11 @@ export class SchedulesStore {
       return null;
     }
 
-    const event: ScheduleEvent = { id: randomUUID(), ...eventData };
+    const { targetDeviceIds, ...eventFields } = eventData;
+    const event = withTargets<ScheduleEvent>(
+      { id: randomUUID(), ...eventFields },
+      targetDeviceIds
+    );
     const updated = {
       ...schedules[index],
       events: [...schedules[index].events, event]
@@ -116,6 +144,7 @@ export class SchedulesStore {
       bookmarkId?: string;
       enabled?: boolean;
       recurrence?: ScheduleEventRecurrence;
+      targetDeviceIds?: string[];
     }
   ): Promise<Schedule | null> {
     if (patch.time !== undefined && !isClockTime(patch.time)) {
@@ -138,7 +167,12 @@ export class SchedulesStore {
     }
 
     const events = [...schedules[scheduleIndex].events];
-    events[eventIndex] = { ...events[eventIndex], ...patch };
+    const { targetDeviceIds, ...fields } = patch;
+    let event: ScheduleEvent = { ...events[eventIndex], ...fields };
+    if (targetDeviceIds !== undefined) {
+      event = withTargets(event, targetDeviceIds);
+    }
+    events[eventIndex] = event;
     const updated = { ...schedules[scheduleIndex], events };
     schedules[scheduleIndex] = updated;
     await writeJsonFile(this.filePath, schedules);

@@ -36,8 +36,14 @@ import type { BookmarksStore } from "./storage/bookmarksStore";
 import type { ControllerStateStore } from "./storage/controllerStateStore";
 import type { SchedulesStore } from "./storage/schedulesStore";
 import type { ScheduleRunner } from "./scheduler";
-import type { TabEntry } from "./index";
+import type { DevicesStore } from "./storage/devicesStore";
+import type { TabRegistry } from "./tabRegistry";
 import { handleGetTabs, handleCloseTab } from "./api/tabs";
+import {
+  handleListDevices,
+  handleRenameDevice,
+  handleForgetDevice
+} from "./api/devices";
 import { ControllerSocketServer } from "./ws/socketServer";
 import { BrowserSocketServer } from "./ws/browserSocketServer";
 
@@ -50,11 +56,12 @@ export type ControllerServerOptions = {
   stateRef: { current: ControllerState };
   bookmarksStore: BookmarksStore;
   schedulesStore: SchedulesStore;
+  devicesStore: DevicesStore;
   controllerStateStore: ControllerStateStore;
   scheduleRunnerRef: { current: ScheduleRunner | null };
-  tabRegistry: Map<number, TabEntry>;
-  onExtensionMessage: (message: ExtensionToControllerMessage) => Promise<void>;
-  onExtensionClose: () => void;
+  tabRegistry: TabRegistry;
+  onExtensionMessage: (message: ExtensionToControllerMessage, deviceId: string) => Promise<void>;
+  onExtensionClose: (deviceId: string) => void;
   getLogs: () => readonly LogEntry[];
 };
 
@@ -206,7 +213,46 @@ async function handleRequest(
     }
   }
 
+  // --- Devices ---
+
+  const deviceDeps = {
+    devicesStore: options.devicesStore,
+    schedulesStore: options.schedulesStore,
+    socketServer,
+    tabRegistry: options.tabRegistry,
+    browserSocketServer
+  };
+
+  if (method === "GET" && pathname === "/api/devices") {
+    await handleListDevices(response, deviceDeps);
+    return;
+  }
+
+  {
+    const params = matchPath("/api/devices/:id", pathname);
+    if (params) {
+      if (method === "PATCH") {
+        await handleRenameDevice(request, response, params.id, deviceDeps);
+        return;
+      }
+      if (method === "DELETE") {
+        await handleForgetDevice(response, params.id, deviceDeps);
+        return;
+      }
+    }
+  }
+
   // --- Schedules ---
+
+  const scheduleDeps = {
+    schedulesStore: options.schedulesStore,
+    devicesStore: options.devicesStore,
+    controllerStateStore: options.controllerStateStore,
+    stateRef: options.stateRef,
+    browserSocketServer,
+    getExtensionConnectionCount: () => socketServer.getConnectionCount(),
+    scheduleRunner: options.scheduleRunnerRef.current
+  };
 
   if (method === "GET" && pathname === "/api/schedules") {
     sendJson(response, 200, {
@@ -216,13 +262,7 @@ async function handleRequest(
   }
 
   if (method === "POST" && pathname === "/api/schedules") {
-    await handleCreateSchedule(request, response, {
-      schedulesStore: options.schedulesStore,
-      controllerStateStore: options.controllerStateStore,
-      stateRef: options.stateRef,
-      browserSocketServer,
-      getExtensionConnectionCount: () => socketServer.getConnectionCount()
-    });
+    await handleCreateSchedule(request, response, scheduleDeps);
     return;
   }
 
@@ -230,23 +270,11 @@ async function handleRequest(
     const params = matchPath("/api/schedules/:id", pathname);
     if (params) {
       if (method === "PATCH") {
-        await handleUpdateSchedule(request, response, params.id, {
-          schedulesStore: options.schedulesStore,
-          controllerStateStore: options.controllerStateStore,
-          stateRef: options.stateRef,
-          browserSocketServer,
-          getExtensionConnectionCount: () => socketServer.getConnectionCount()
-        });
+        await handleUpdateSchedule(request, response, params.id, scheduleDeps);
         return;
       }
       if (method === "DELETE") {
-        await handleDeleteSchedule(response, params.id, {
-          schedulesStore: options.schedulesStore,
-          controllerStateStore: options.controllerStateStore,
-          stateRef: options.stateRef,
-          browserSocketServer,
-          getExtensionConnectionCount: () => socketServer.getConnectionCount()
-        });
+        await handleDeleteSchedule(response, params.id, scheduleDeps);
         return;
       }
     }
@@ -255,13 +283,7 @@ async function handleRequest(
   {
     const params = matchPath("/api/schedules/:id/duplicate", pathname);
     if (params && method === "POST") {
-      await handleDuplicateSchedule(response, params.id, {
-        schedulesStore: options.schedulesStore,
-        controllerStateStore: options.controllerStateStore,
-        stateRef: options.stateRef,
-        browserSocketServer,
-        getExtensionConnectionCount: () => socketServer.getConnectionCount()
-      });
+      await handleDuplicateSchedule(response, params.id, scheduleDeps);
       return;
     }
   }
@@ -269,14 +291,7 @@ async function handleRequest(
   {
     const params = matchPath("/api/schedules/:id/activate", pathname);
     if (params && method === "POST") {
-      await handleActivateSchedule(response, params.id, {
-        schedulesStore: options.schedulesStore,
-        controllerStateStore: options.controllerStateStore,
-        stateRef: options.stateRef,
-        browserSocketServer,
-        getExtensionConnectionCount: () => socketServer.getConnectionCount(),
-        scheduleRunner: options.scheduleRunnerRef.current
-      });
+      await handleActivateSchedule(response, params.id, scheduleDeps);
       return;
     }
   }
@@ -284,14 +299,7 @@ async function handleRequest(
   {
     const params = matchPath("/api/schedules/:id/deactivate", pathname);
     if (params && method === "POST") {
-      await handleDeactivateSchedule(response, params.id, {
-        schedulesStore: options.schedulesStore,
-        controllerStateStore: options.controllerStateStore,
-        stateRef: options.stateRef,
-        browserSocketServer,
-        getExtensionConnectionCount: () => socketServer.getConnectionCount(),
-        scheduleRunner: options.scheduleRunnerRef.current
-      });
+      await handleDeactivateSchedule(response, params.id, scheduleDeps);
       return;
     }
   }
@@ -299,13 +307,7 @@ async function handleRequest(
   {
     const params = matchPath("/api/schedules/:id/events", pathname);
     if (params && method === "POST") {
-      await handleAddEvent(request, response, params.id, {
-        schedulesStore: options.schedulesStore,
-        controllerStateStore: options.controllerStateStore,
-        stateRef: options.stateRef,
-        browserSocketServer,
-        getExtensionConnectionCount: () => socketServer.getConnectionCount()
-      });
+      await handleAddEvent(request, response, params.id, scheduleDeps);
       return;
     }
   }
@@ -314,23 +316,11 @@ async function handleRequest(
     const params = matchPath("/api/schedules/:scheduleId/events/:eventId", pathname);
     if (params) {
       if (method === "PATCH") {
-        await handleUpdateEvent(request, response, params.scheduleId, params.eventId, {
-          schedulesStore: options.schedulesStore,
-          controllerStateStore: options.controllerStateStore,
-          stateRef: options.stateRef,
-          browserSocketServer,
-          getExtensionConnectionCount: () => socketServer.getConnectionCount()
-        });
+        await handleUpdateEvent(request, response, params.scheduleId, params.eventId, scheduleDeps);
         return;
       }
       if (method === "DELETE") {
-        await handleRemoveEvent(response, params.scheduleId, params.eventId, {
-          schedulesStore: options.schedulesStore,
-          controllerStateStore: options.controllerStateStore,
-          stateRef: options.stateRef,
-          browserSocketServer,
-          getExtensionConnectionCount: () => socketServer.getConnectionCount()
-        });
+        await handleRemoveEvent(response, params.scheduleId, params.eventId, scheduleDeps);
         return;
       }
     }
@@ -368,30 +358,59 @@ async function handleRequest(
         ? body.bookmarkId
         : null;
     const source = parseSource(body);
+    const requestedDeviceIds =
+      isRecord(body) && body.deviceIds !== undefined ? body.deviceIds : undefined;
 
     if (!urlValue || !isValidUrl(urlValue)) {
       sendJson(response, 400, { error: "A valid url is required" });
       return;
     }
 
-    const command: OpenUrlCommand = {
-      type: "open_url",
-      commandId: randomUUID(),
-      sentAt: new Date().toISOString(),
-      url: urlValue,
-      bookmarkId,
-      source
-    };
+    if (
+      requestedDeviceIds !== undefined &&
+      (!Array.isArray(requestedDeviceIds) ||
+        !requestedDeviceIds.every((id) => typeof id === "string"))
+    ) {
+      sendJson(response, 400, { error: "deviceIds must be an array of device ids" });
+      return;
+    }
 
-    const wasSent = socketServer.sendCommand(command);
+    // No deviceIds (or an empty list) means every connected device.
+    const targetIds =
+      requestedDeviceIds && requestedDeviceIds.length > 0
+        ? (requestedDeviceIds as string[])
+        : socketServer.getConnectedDeviceIds();
 
-    if (!wasSent) {
-      sendJson(response, 503, { error: "No extension is connected" });
+    const sentAt = new Date().toISOString();
+    const deliveredTo: string[] = [];
+
+    for (const deviceId of targetIds) {
+      const command: OpenUrlCommand = {
+        type: "open_url",
+        commandId: randomUUID(),
+        sentAt,
+        url: urlValue,
+        bookmarkId,
+        source
+      };
+
+      if (socketServer.sendCommand(command, deviceId)) {
+        deliveredTo.push(deviceId);
+      }
+    }
+
+    if (deliveredTo.length === 0) {
+      sendJson(response, 503, {
+        error:
+          requestedDeviceIds && requestedDeviceIds.length > 0
+            ? "None of the selected devices are connected"
+            : "No extension is connected"
+      });
       return;
     }
 
     if (bookmarkId) {
-      await options.bookmarksStore.recordOpen(bookmarkId, command.sentAt);
+      await options.bookmarksStore.recordOpen(bookmarkId, sentAt);
       const bookmarks = await options.bookmarksStore.list();
       browserSocketServer.broadcast({ type: "bookmarks_updated", bookmarks });
     }
@@ -402,7 +421,7 @@ async function handleRequest(
       activeTabAction: {
         bookmarkId,
         url: urlValue,
-        startedAt: command.sentAt,
+        startedAt: sentAt,
         source,
         status: "pending"
       }
@@ -416,7 +435,7 @@ async function handleRequest(
       extensionConnections: socketServer.getConnectionCount()
     });
 
-    sendJson(response, 202, { ok: true, commandId: command.commandId });
+    sendJson(response, 202, { ok: true, deviceIds: deliveredTo });
     return;
   }
 
@@ -428,14 +447,14 @@ async function handleRequest(
   }
 
   {
-    const params = matchPath("/api/tabs/:tabId", pathname);
+    const params = matchPath("/api/devices/:deviceId/tabs/:tabId", pathname);
     if (params && method === "DELETE") {
       const tabId = parseInt(params.tabId, 10);
       if (isNaN(tabId)) {
         sendJson(response, 400, { error: "tabId must be a number" });
         return;
       }
-      await handleCloseTab(response, tabId, { socketServer });
+      await handleCloseTab(response, params.deviceId, tabId, { socketServer });
       return;
     }
   }

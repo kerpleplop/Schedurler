@@ -7,6 +7,7 @@ const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 let schedules = [];
 let bookmarks = [];
 let activeScheduleId = null;
+let devices = [];
 
 export function setSchedules(data) {
   schedules = data;
@@ -17,13 +18,21 @@ export function setBookmarks(data) {
   bookmarks = data;
 }
 
+// devices_updated fires on every tab change; only re-render when the list a user could pick from changes.
+export function setDevices(data) {
+  const changed = deviceSignature(data) !== deviceSignature(devices);
+  devices = data;
+  if (changed) render();
+}
+
 export function setActiveScheduleId(id) {
   activeScheduleId = id;
   render();
 }
 
-export async function init(bookmarkList) {
+export async function init(bookmarkList, deviceList) {
   bookmarks = bookmarkList;
+  devices = deviceList ?? [];
   schedules = await api.listSchedules();
   render();
 }
@@ -167,6 +176,9 @@ function buildScheduleCard(schedule) {
   const stats = buildStatsLine(schedule);
   if (stats) card.appendChild(stats);
 
+  const targets = buildTargetsLine(schedule);
+  if (targets) card.appendChild(targets);
+
   // Events list
   card.appendChild(buildEventsSection(schedule));
 
@@ -183,6 +195,75 @@ function buildStatsLine(schedule) {
   p.className = "schedule-stats";
   p.textContent = `Fired ${runCount} time${runCount === 1 ? "" : "s"} · last: ${relativeTime(lastFiredAt)} → ${bookmarkName}`;
   return p;
+}
+
+function deviceSignature(list) {
+  return JSON.stringify(list.map(d => [d.id, d.name]));
+}
+
+function deviceName(id) {
+  return devices.find(d => d.id === id)?.name ?? id;
+}
+
+function formatTargets(ids) {
+  return ids && ids.length > 0 ? ids.map(deviceName).join(", ") : "All devices";
+}
+
+function deviceCheckboxesHtml(selectedIds) {
+  return devices.map(d => `
+    <label class="day-checkbox">
+      <input type="checkbox" name="targetDeviceIds" value="${esc(d.id)}" ${selectedIds.includes(d.id) ? "checked" : ""} />
+      ${esc(d.name)}
+    </label>`).join("");
+}
+
+// Only offered once there is more than one device to choose between.
+function targetFieldsHtml(selectedIds) {
+  if (devices.length < 2) return "";
+  return `<span class="target-fields"><span class="field-label">Devices (none = schedule default):</span> ${deviceCheckboxesHtml(selectedIds)}</span>`;
+}
+
+function buildTargetsLine(schedule) {
+  const hasTargets = (schedule.targetDeviceIds ?? []).length > 0;
+  if (devices.length < 2 && !hasTargets) return null;
+
+  const p = document.createElement("p");
+  p.className = "schedule-targets";
+  p.append(`Runs on: ${formatTargets(schedule.targetDeviceIds)} `);
+
+  const changeBtn = document.createElement("button");
+  changeBtn.textContent = "Change";
+  changeBtn.addEventListener("click", () => showTargetsForm(p, schedule));
+  p.appendChild(changeBtn);
+
+  return p;
+}
+
+function showTargetsForm(line, schedule) {
+  const form = document.createElement("form");
+  form.className = "edit-form";
+  form.innerHTML = `
+    <span class="field-label">Run on (none = all devices):</span>
+    ${deviceCheckboxesHtml(schedule.targetDeviceIds ?? [])}
+    <button type="submit">Save</button>
+    <button type="button" class="btn-cancel">Cancel</button>
+  `;
+
+  form.querySelector(".btn-cancel").addEventListener("click", () => render());
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const targetDeviceIds = new FormData(form).getAll("targetDeviceIds");
+    try {
+      await api.updateSchedule(schedule.id, { targetDeviceIds });
+      schedules = await api.listSchedules();
+      render();
+    } catch (err) {
+      showError(section, err.message);
+    }
+  });
+
+  line.replaceWith(form);
 }
 
 function showRenameForm(card, schedule) {
@@ -248,7 +329,7 @@ function buildEventRow(schedule, event, list) {
 
   const info = document.createElement("span");
   info.className = "event-info";
-  info.innerHTML = `<code>${esc(event.time)}</code> — ${esc(bookmarkName)} <span class="event-recurrence">${esc(formatRecurrence(event.recurrence))}</span> ${event.enabled ? "" : '<em>(disabled)</em>'}`;
+  info.innerHTML = `<code>${esc(event.time)}</code> — ${esc(bookmarkName)} <span class="event-recurrence">${esc(formatRecurrence(event.recurrence))}</span> ${(event.targetDeviceIds ?? []).length > 0 ? `<span class="event-targets">→ ${esc(formatTargets(event.targetDeviceIds))}</span>` : ""} ${event.enabled ? "" : '<em>(disabled)</em>'}`;
   li.appendChild(info);
 
   const actions = document.createElement("span");
@@ -299,6 +380,7 @@ function showEditEventForm(li, schedule, event) {
       ${bookmarks.map(b => `<option value="${esc(b.id)}" ${b.id === event.bookmarkId ? "selected" : ""}>${esc(b.name)}</option>`).join("")}
     </select>
     ${recurrenceFieldsHtml(event.recurrence)}
+    ${targetFieldsHtml(event.targetDeviceIds ?? [])}
     <label><input name="enabled" type="checkbox" ${event.enabled ? "checked" : ""} /> Enabled</label>
     <button type="submit">Save</button>
     <button type="button" class="btn-cancel">Cancel</button>
@@ -323,6 +405,9 @@ function showEditEventForm(li, schedule, event) {
       enabled: form.querySelector('[name="enabled"]').checked,
       recurrence
     };
+    if (form.querySelector(".target-fields")) {
+      patch.targetDeviceIds = fd.getAll("targetDeviceIds");
+    }
     try {
       const updated = await api.updateEvent(schedule.id, event.id, patch);
       schedules = schedules.map(s => s.id === schedule.id ? updated : s);
@@ -344,6 +429,7 @@ function buildAddEventForm(schedule) {
       ${bookmarks.map(b => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join("")}
     </select>
     ${recurrenceFieldsHtml()}
+    ${targetFieldsHtml([])}
     <button type="submit">Add event</button>
   `;
 
@@ -373,6 +459,9 @@ function buildAddEventForm(schedule) {
       enabled: true,
       recurrence
     };
+    if (form.querySelector(".target-fields")) {
+      data.targetDeviceIds = fd.getAll("targetDeviceIds");
+    }
     try {
       const updated = await api.addEvent(schedule.id, data);
       schedules = schedules.map(s => s.id === schedule.id ? updated : s);

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ServerResponse } from "node:http";
 import type { CloseTabCommand, GetTabsCommand } from "@schedurler/shared";
-import type { TabEntry } from "../index";
+import type { TabRegistry } from "../tabRegistry";
 import type { ControllerSocketServer } from "../ws/socketServer";
 
 function sendJson(response: ServerResponse, status: number, payload: unknown): void {
@@ -12,26 +12,27 @@ function sendJson(response: ServerResponse, status: number, payload: unknown): v
 
 export function handleGetTabs(
   response: ServerResponse,
-  deps: { tabRegistry: Map<number, TabEntry>; socketServer: ControllerSocketServer }
+  deps: { tabRegistry: TabRegistry; socketServer: ControllerSocketServer }
 ): void {
-  const tabs = Array.from(deps.tabRegistry.values());
-
-  // If the registry is empty and an extension is connected, request a fresh snapshot.
+  // Ask any connected device we have no tabs for to send a fresh snapshot.
   // The result arrives asynchronously via tabs_updated on the UI WebSocket.
-  if (tabs.length === 0) {
-    const command: GetTabsCommand = {
-      type: "get_tabs",
-      commandId: randomUUID(),
-      sentAt: new Date().toISOString()
-    };
-    deps.socketServer.sendCommand(command);
+  for (const deviceId of deps.socketServer.getConnectedDeviceIds()) {
+    if (deps.tabRegistry.countForDevice(deviceId) === 0) {
+      const command: GetTabsCommand = {
+        type: "get_tabs",
+        commandId: randomUUID(),
+        sentAt: new Date().toISOString()
+      };
+      deps.socketServer.sendCommand(command, deviceId);
+    }
   }
 
-  sendJson(response, 200, { tabs });
+  sendJson(response, 200, { tabs: deps.tabRegistry.all() });
 }
 
 export async function handleCloseTab(
   response: ServerResponse,
+  deviceId: string,
   tabId: number,
   deps: { socketServer: ControllerSocketServer }
 ): Promise<void> {
@@ -42,10 +43,10 @@ export async function handleCloseTab(
     tabId
   };
 
-  const sent = deps.socketServer.sendCommand(command);
+  const sent = deps.socketServer.sendCommand(command, deviceId);
 
   if (!sent) {
-    sendJson(response, 503, { error: "No extension is connected" });
+    sendJson(response, 503, { error: "Device is not connected" });
     return;
   }
 

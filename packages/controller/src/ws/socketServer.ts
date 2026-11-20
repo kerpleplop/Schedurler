@@ -8,8 +8,10 @@ import {
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 
 export type ControllerSocketServerOptions = {
-  onMessage: (message: ExtensionToControllerMessage) => Promise<void> | void;
-  onClose: () => void;
+  /** Called for every valid message once the socket has identified itself with a hello. */
+  onMessage: (message: ExtensionToControllerMessage, deviceId: string) => Promise<void> | void;
+  /** Called when the socket currently bound to a device closes. */
+  onClose: (deviceId: string) => void;
 };
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
@@ -18,6 +20,9 @@ export class ControllerSocketServer {
   private readonly wss: WebSocketServer;
   private readonly sockets = new Set<WebSocket>();
   private readonly alive = new WeakSet<WebSocket>();
+  // A device is bound to its socket by the hello message; the newest socket wins.
+  private readonly socketsByDevice = new Map<string, WebSocket>();
+  private readonly deviceBySocket = new WeakMap<WebSocket, string>();
   private readonly onMessage: ControllerSocketServerOptions["onMessage"];
   private readonly heartbeat: ReturnType<typeof setInterval>;
 
@@ -32,12 +37,23 @@ export class ControllerSocketServer {
       socket.on("pong", () => this.alive.add(socket));
 
       socket.on("message", async (data) => {
-        await this.handleMessage(data);
+        try {
+          await this.handleMessage(socket, data);
+        } catch (error) {
+          // One bad message must not take the controller (and every other device) down.
+          console.error("[schedurler] failed to handle extension message", error);
+        }
       });
 
       socket.on("close", () => {
         this.sockets.delete(socket);
-        options.onClose();
+
+        // A socket replaced by a reconnect must not mark the device as gone.
+        const deviceId = this.deviceBySocket.get(socket);
+        if (deviceId !== undefined && this.socketsByDevice.get(deviceId) === socket) {
+          this.socketsByDevice.delete(deviceId);
+          options.onClose(deviceId);
+        }
       });
 
       socket.on("error", (error) => {
@@ -66,32 +82,40 @@ export class ControllerSocketServer {
     });
   }
 
+  /** Ids of devices that have said hello and still have an open socket. */
+  getConnectedDeviceIds(): string[] {
+    const ids: string[] = [];
+
+    for (const [deviceId, socket] of this.socketsByDevice) {
+      if (socket.readyState === WebSocket.OPEN) {
+        ids.push(deviceId);
+      }
+    }
+
+    return ids;
+  }
+
+  isDeviceConnected(deviceId: string): boolean {
+    return this.socketsByDevice.get(deviceId)?.readyState === WebSocket.OPEN;
+  }
+
   getConnectionCount(): number {
-    let count = 0;
-
-    for (const socket of this.sockets) {
-      if (socket.readyState === WebSocket.OPEN) {
-        count += 1;
-      }
-    }
-
-    return count;
+    return this.getConnectedDeviceIds().length;
   }
 
-  sendCommand(command: ControllerToExtensionMessage): boolean {
-    const payload = JSON.stringify(command);
+  /** Send a command to one device. Returns false if that device is not connected. */
+  sendCommand(command: ControllerToExtensionMessage, deviceId: string): boolean {
+    const socket = this.socketsByDevice.get(deviceId);
 
-    for (const socket of this.sockets) {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(payload);
-        return true;
-      }
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return false;
     }
 
-    return false;
+    socket.send(JSON.stringify(command));
+    return true;
   }
 
-  private async handleMessage(data: RawData): Promise<void> {
+  private async handleMessage(socket: WebSocket, data: RawData): Promise<void> {
     const text = toUtf8(data);
     let parsed: unknown;
 
@@ -107,7 +131,30 @@ export class ControllerSocketServer {
       return;
     }
 
-    await this.onMessage(parsed);
+    if (parsed.type === "hello") {
+      this.bindDevice(socket, parsed.deviceId);
+    }
+
+    const deviceId = this.deviceBySocket.get(socket);
+
+    if (deviceId === undefined) {
+      console.error("[schedurler] ignoring message from socket that has not sent hello");
+      return;
+    }
+
+    await this.onMessage(parsed, deviceId);
+  }
+
+  private bindDevice(socket: WebSocket, deviceId: string): void {
+    const previous = this.socketsByDevice.get(deviceId);
+
+    // Same install reconnecting before the old socket timed out: drop the stale one.
+    if (previous && previous !== socket) {
+      previous.terminate();
+    }
+
+    this.socketsByDevice.set(deviceId, socket);
+    this.deviceBySocket.set(socket, deviceId);
   }
 }
 

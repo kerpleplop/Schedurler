@@ -32,6 +32,11 @@ export const addEvent = (scheduleId, data) => request("POST", `/api/schedules/${
 export const updateEvent = (scheduleId, eventId, patch) => request("PATCH", `/api/schedules/${scheduleId}/events/${eventId}`, patch).then(d => d.schedule);
 export const deleteEvent = (scheduleId, eventId) => request("DELETE", `/api/schedules/${scheduleId}/events/${eventId}`).then(d => d.schedule);
 
+// Devices
+export const listDevices = () => request("GET", "/api/devices").then(d => d.devices);
+export const renameDevice = (id, name) => request("PATCH", `/api/devices/${id}`, { name }).then(d => d.device);
+export const forgetDevice = (id) => request("DELETE", `/api/devices/${id}`);
+
 // Logs
 export const getLogs = () => request("GET", "/api/logs").then(d => d.logs);
 
@@ -41,7 +46,7 @@ export const setScheduleEnabled = (enabled) => request("POST", "/api/state/sched
 
 // Tabs
 export const getTabs = () => request("GET", "/api/tabs").then(d => d.tabs);
-export const closeTab = (tabId) => request("DELETE", `/api/tabs/${tabId}`);
+export const closeTab = (deviceId, tabId) => request("DELETE", `/api/devices/${deviceId}/tabs/${tabId}`);
 
 // Commands
-export const openUrl = (url, bookmarkId) => request("POST", "/api/commands/open-url", { url, bookmarkId, source: "manual" });
+export const openUrl = (url, bookmarkId, deviceIds) => request("POST", "/api/commands/open-url", { url, bookmarkId, source: "manual", ...(deviceIds ? { deviceIds } : {}) });

@@ -8,6 +8,7 @@ type Deps = {
   stateRef: { current: ControllerState };
   browserSocketServer: BrowserSocketServer;
   getExtensionConnectionCount: () => number;
+  getLastReconnectAttempt?: () => number;
 };
 
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {
@@ -31,7 +32,8 @@ export function handleGetState(
 ): void {
   sendJson(response, 200, {
     state: deps.stateRef.current,
-    extensionConnections: deps.getExtensionConnectionCount()
+    extensionConnections: deps.getExtensionConnectionCount(),
+    lastReconnectAttempt: deps.getLastReconnectAttempt?.() ?? 0
   });
 }
 

@@ -1,10 +1,13 @@
 const DEFAULT_CONTROLLER_WS_URL = "ws://127.0.0.1:4312/ws";
-const RECONNECT_DELAY_MS = 2000;
+// Keep in sync with RECONNECT_* in packages/shared/src/constraints.ts.
+const RECONNECT_BASE_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 30_000;
 const RESERVED_TAB_RECREATE_DELAY_MS = 300;
 
 let socket = null;
 let isConnecting = false;
 let reconnectTimer = null;
+let reconnectAttempt = 0;
 let lastControlledTabId = null;
 
 // Keepalive tab — prevents Firefox from closing when all user-visible tabs are closed.
@@ -49,8 +52,10 @@ function handleOpen() {
     extensionId: "schedurler-firefox-agent",
     browser: "firefox",
     connectedAt: new Date().toISOString(),
-    version: browser.runtime.getManifest().version
+    version: browser.runtime.getManifest().version,
+    reconnectAttempt
   });
+  reconnectAttempt = 0;
 
   sendStatus("ready", "Connected to controller");
 
@@ -303,12 +308,18 @@ function scheduleReconnect() {
     return;
   }
 
+  // Double the delay after each failed attempt, up to the cap, then wait a random time
+  // in its upper half so browsers don't all retry at once after a controller restart.
+  const cappedDelay = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempt, RECONNECT_MAX_DELAY_MS);
+  const delay = cappedDelay / 2 + Math.random() * (cappedDelay / 2);
+  reconnectAttempt += 1;
+
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     connect().catch((error) => {
       console.error("[schedurler-extension] reconnect failed", error);
     });
-  }, RECONNECT_DELAY_MS);
+  }, delay);
 }
 
 browser.tabs.onRemoved.addListener((tabId) => {

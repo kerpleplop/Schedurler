@@ -265,7 +265,9 @@ export function isExtensionToControllerMessage(
         typeof value.extensionId === "string" &&
         value.browser === "firefox" &&
         typeof value.connectedAt === "string" &&
-        (value.version === undefined || typeof value.version === "string")
+        (value.version === undefined || typeof value.version === "string") &&
+        (value.reconnectAttempt === undefined ||
+          (Number.isInteger(value.reconnectAttempt) && (value.reconnectAttempt as number) >= 0))
       );
     case "status":
       return (

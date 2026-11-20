@@ -7,6 +7,10 @@ export const DEFAULT_CONTROLLER_HOST = "127.0.0.1";
 export const DEFAULT_CONTROLLER_PORT = 4312;
 export const DEFAULT_CONTROLLER_WS_PATH = "/ws";
 
+// Mirrored in packages/extension/src/background.js, which can't import this package.
+export const RECONNECT_BASE_DELAY_MS = 1000;
+export const RECONNECT_MAX_DELAY_MS = 30_000;
+
 export const CLOCK_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 export const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 

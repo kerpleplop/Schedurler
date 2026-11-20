@@ -17,6 +17,7 @@ body {
   color: #eee;
   font-size: 13px;
 }
+#extension-count.reconnected { color: #f0b429; cursor: help; }
 #app-name { font-weight: 700; font-size: 15px; margin-right: auto; }
 #status-tab-action { color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 35ch; }
 
